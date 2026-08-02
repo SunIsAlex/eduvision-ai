@@ -55,7 +55,9 @@ export const TOOL_DEFINITIONS = [
     function: {
       name: "javascript",
       description:
-        "在用户浏览器本地沙箱（Web Worker，无页面/DOM/文件访问权限，风险由用户承担）执行 JavaScript，用于枚举、计数、暴力验证、统计、递推、以及 calculator 做不了的计算（如求方程根、循环模拟）等场景。支持标准 JS：let/const、for/while、if/else、数组、对象、字符串、Math、BigInt；必须用 console.log 输出最终结果；注意避免死循环（15 秒超时）。示例代码：\nlet count=0;\nfor(let a=1;a<=6;a++){ for(let b=1;b<=6;b++){ if(a+b===7) count++; } }\nconsole.log(count)",
+        "在用户浏览器本地沙箱（Web Worker，无页面/DOM/文件访问权限，风险由用户承担）执行 JavaScript。适用于非线性方程数值求根、联立平衡方程迭代、物料衡算、络合/酸碱/溶解平衡、枚举、计数、递推，以及 calculator 无法完成的计算。支持标准 JS：let/const、for/while、if/else、数组、对象、字符串、Math、BigInt；必须用 console.log 输出最终结果；注意避免死循环（15 秒超时）。代码必须是可直接执行的完整脚本：禁止顶层 return；禁止用同一名称同时表示函数与数值；禁止对数值做数组解构；每个变量先定义再引用。\n" +
+          "数值求根优先使用二分法：先根据物理意义确定 lo/hi，确认 f(lo) 与 f(hi) 异号，迭代约 100 次，最后输出 root、f(root) 残差及单位换算。模板：\nfunction bisect(f,lo,hi){let flo=f(lo),fhi=f(hi);if(flo*fhi>0)throw new Error('root not bracketed');for(let i=0;i<100;i++){const mid=(lo+hi)/2,fm=f(mid);if(flo*fm<=0){hi=mid;fhi=fm;}else{lo=mid;flo=fm;}}return (lo+hi)/2;}\nconst f=x=>x*x-2;\nconst root=bisect(f,0,2);\nconsole.log(JSON.stringify({root,residual:f(root)}));\n" +
+          "枚举示例：\nlet count=0;\nfor(let a=1;a<=6;a++){for(let b=1;b<=6;b++){if(a+b===7)count++;}}\nconsole.log(count)",
       parameters: {
         type: "object",
         properties: { code: { type: "string", description: "要执行的 JavaScript 代码" } },

@@ -36,10 +36,9 @@ export interface Env {
  * and produces the teacher-style explanation. Override via AI_MODEL.
  */
 export const MODELS = {
-  // 32B-Thinking：比 8B 更聪明，且工具调用流程在 SiliconFlow 上验证正常。
-  // 注意：Qwen3-VL 的 Instruct 系列（32B-Instruct / 30B-A3B-Instruct）在
-  // 工具结果回填后会返回空内容，无法完成工具管线，不要选。
-  VISION: "Qwen/Qwen3-VL-32B-Thinking",
+  // Qwen3.5-397B：原生多模态；复杂数值题的工具规划与 JavaScript 生成
+  // 比旧的 Qwen3-VL-32B-Thinking 稳定。仍可通过 AI_MODEL 覆盖。
+  VISION: "Qwen/Qwen3.5-397B-A17B",
 } as const;
 
 export const DEFAULT_BASE_URL = "https://api.siliconflow.cn/v1";

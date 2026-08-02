@@ -11,7 +11,7 @@
 Cloudflare Worker (Hono + TypeScript)
         │
         ▼
-  单模型：Qwen/Qwen3-VL-8B-Thinking（默认，可用 AI_MODEL 覆盖）
+  单模型：Qwen/Qwen3.5-397B-A17B（默认，可用 AI_MODEL 覆盖）
         │  原始图片像素端到端保留，直接读图作答
         ▼
    SSE 事件流：thinking → reasoning → [tool_call → 浏览器执行 → tool_result] → answer → done
@@ -29,7 +29,7 @@ Cloudflare Worker (Hono + TypeScript)
 - 拍照/拖拽上传题目图片，客户端自动压缩后上传
 - 一个多模态模型读图 + 作答 + 老师式分步讲解（Markdown + LaTeX 公式渲染）
 - SSE 流式输出：`thinking`（开始提示）→ `reasoning`（思维链逐字实时显示）→ `answer`（解题内容逐字输出）→ `done`；模型调用工具时中间插入 `tool_call` / `tool_result` 事件
-- 工具支持：`calculator`（精确数学计算，mathjs 加固沙箱）与 `javascript`（Web Worker 沙箱枚举/计数），工具调用与结果在聊天中可视化展示
+- 工具支持：`calculator`（精确数学计算，mathjs 加固沙箱）与 `javascript`（Web Worker 沙箱数值求根、平衡方程迭代、枚举/计数），工具调用与结果在聊天中可视化展示
 - 按题目难度自适应讲解，限制无效思考（普通题首轮/后续 1024/512 token，强制计算器题 256/128 token；回答上限 4096 token）
 - 移动端响应式聊天界面，API Key 只在 Worker Secret 中
 
@@ -62,7 +62,7 @@ Cloudflare Worker (Hono + TypeScript)
 
 ## 快速开始
 
-前置：Node ≥ 20、npm ≥ 10。需要 [SiliconFlow](https://cloud.siliconflow.cn) API Key（默认模型 `Qwen/Qwen3-VL-8B-Thinking`，可在 `.dev.vars` 中用 `AI_MODEL` 换成 `Qwen/Qwen2.5-VL-72B-Instruct` 等更强 OCR 的模型）。
+前置：Node ≥ 20、npm ≥ 10。需要 [SiliconFlow](https://cloud.siliconflow.cn) API Key（默认模型 `Qwen/Qwen3.5-397B-A17B`，可在 `.dev.vars` 中用 `AI_MODEL` 覆盖）。
 
 ```bash
 npm install
@@ -116,7 +116,7 @@ npm run deploy                      # 构建前端并部署 Worker（静态资�
 | `tool_call` | `{"toolCallId":"…","name":"calculator","args":"{\"expression\":\"123*456\"}","executor":"browser"}` | 模型请求调用工具；浏览器执行完毕后 POST `/api/tool/result` |
 | `tool_result` | `{"toolCallId":"…","name":"calculator","ok":true,"output":"56088"}` | 工具执行结果（随后模型会继续流式推理/作答） |
 | `answer` | `{"text":"先观察系数：…"}` | 逐段推送的解答内容 |
-| `done` | `{"pipeline":"multimodal","model":"Qwen/Qwen3-VL-8B-Thinking"}` | 管线结束 |
+| `done` | `{"pipeline":"multimodal","model":"Qwen/Qwen3.5-397B-A17B"}` | 管线结束 |
 | `error` | `{"text":"…"}` | 错误信息（保证最终能收到终止事件） |
 
 ### `POST /api/tool/result`
@@ -144,7 +144,7 @@ multipart 表单，字段 `file`（图片 ≤ 10MB）。配置 R2 后返回 `{ur
 | 工具 | 在哪执行 | 说明 |
 | --- | --- | --- |
 | `calculator` | 浏览器主线程 | 加固版 mathjs（BigNumber 高精度）：禁用 `import / createUnit / reviver / evaluate / parse / simplify / derivative / resolve`，限制表达式长度、节点数、阶乘/组合/指数/矩阵规模，防止重计算。工具描述内置分类函数清单（数论组合 / 统计 / 线性代数 / 集合 / 单位换算 / 进制 / 常量），模型据此选用正确的函数名；不支持 `//`，整数除法用 `floor(a/b)`；报错信息会给出可操作的修正提示（如不支持中文/`//`、函数名拼写错误），模型可据此自我修正。mathjs 按需懒加载（独立 chunk，gzip 约 190KB），首次调用计算器时才下载 |
-| `javascript` | 浏览器 Web Worker | 标准 JS（枚举、计数、暴力验证、统计），`console.log` 输出被捕获回传；Worker 无 DOM/页面访问权限，`fetch` / `importScripts` 被禁用，15 秒硬超时终止死循环 |
+| `javascript` | 浏览器 Web Worker | 标准 JS（非线性方程数值求根、化学平衡/物料衡算迭代、枚举、计数、暴力验证、统计）；优先使用带物理区间与残差校验的二分法，`console.log` 输出被捕获回传；Worker 无 DOM/页面访问权限，`fetch` / `importScripts` 被禁用，15 秒硬超时终止死循环 |
 
 流程：模型流式输出思考 → 需要算数/枚举时发出 `tool_call` → 浏览器本地执行并 POST `/api/tool/result` → Worker 把结果作为 `tool` 消息喂回模型 → 同一条 SSE 连接继续流式输出最终解答。前端聊天区会展示每次工具调用的名称、参数与返回结果，并提示「代码在你的浏览器本地沙箱中执行 · 风险自负」。
 
@@ -154,9 +154,9 @@ multipart 表单，字段 `file`（图片 ≤ 10MB）。配置 R2 后返回 `{ur
 
 | 模型 ID | 说明 |
 | --- | --- |
-| `Qwen/Qwen3-VL-32B-Thinking`（默认） | 更强的多模态读图 + 推理 + 讲解，工具调用流程已实测正常；思维链实时展示 |
-| `Qwen/Qwen3-VL-8B-Thinking`（可选） | 轻量版，速度更快、成本更低，工具调用同样正常 |
-| `Qwen/Qwen3-VL-30B-A3B-Thinking`（可选） | 性价比平衡的 MoE 版本 |
+| `Qwen/Qwen3.5-397B-A17B`（默认） | 原生多模态；复杂数值题的工具规划与 JavaScript 生成更稳定，AgCl 平衡方程工具调用已实测通过 |
+| `Qwen/Qwen3-VL-32B-Thinking`（低成本可选） | 多模态读图与思维链正常，但复杂 JavaScript 工具代码的可靠性较低 |
+| `Qwen/Qwen3-VL-30B-A3B-Thinking`（低成本可选） | 更轻量的 MoE 版本 |
 
 > 注意：Qwen3-VL 的 **Instruct** 系列（`Qwen3-VL-32B-Instruct`、`Qwen3-VL-30B-A3B-Instruct` 等）当前在 SiliconFlow 上存在兼容问题——工具结果回填后模型会返回空内容，无法完成工具管线，**不要选用**；需要切换模型时在 `.dev.vars` / wrangler vars 中设置 `AI_MODEL`。
 
@@ -173,7 +173,7 @@ multipart 表单，字段 `file`（图片 ≤ 10MB）。配置 R2 后返回 `{ur
 
 **本地报「服务端未配置 SILICONFLOW_API_KEY」**：把 Key 写入项目根目录 `.dev.vars` 后重启。
 
-**图片里的中文小字识别不全**：Qwen3-VL-8B 对复杂图片的中文 OCR 有限，可在 `.dev.vars` 中设置 `AI_MODEL=Qwen/Qwen2.5-VL-72B-Instruct` 提升识别质量（模型为纯文本输入时图片仍会保留给多模态模型）。
+**需要降低模型成本**：可在 `.dev.vars` 中设置 `AI_MODEL=Qwen/Qwen3-VL-32B-Thinking`；复杂平衡方程的工具代码生成可靠性会相应降低。
 
 **wrangler 装不上**：Android/Termux 不支持 `workerd`，请使用 `npm run dev`（Node 服务器）；部署在 macOS/Linux/Windows 完成。
 
