@@ -1,7 +1,11 @@
-import Anthropic from "@anthropic-ai/sdk";
 import {
   createClient,
   streamRound,
+  type ImageBlockParam,
+  type MessageCreateParamsStreaming,
+  type MessageParam,
+  type RawMessageStreamEvent,
+  type Tool,
   type RoundResult,
   type StreamDelta,
 } from "./anthropic";
@@ -80,7 +84,7 @@ function buildMessages(input: {
   return messages;
 }
 
-function imageBlock(image: string): Anthropic.Messages.ImageBlockParam {
+function imageBlock(image: string): ImageBlockParam {
   if (image.startsWith("data:")) {
     const match = image.match(/^data:(image\/(?:jpeg|png|gif|webp));base64,(.+)$/s);
     if (!match) throw new Error("不支持的图片 data URL");
@@ -93,7 +97,7 @@ function imageBlock(image: string): Anthropic.Messages.ImageBlockParam {
 }
 
 /** Convert app messages into Anthropic's native multimodal format. */
-function toAnthropicMessages(messages: ChatMessage[]): Anthropic.Messages.MessageParam[] {
+function toAnthropicMessages(messages: ChatMessage[]): MessageParam[] {
   return messages.map((m) => {
     if (m.image) {
       return {
@@ -111,7 +115,7 @@ function toAnthropicMessages(messages: ChatMessage[]): Anthropic.Messages.Messag
  * unverified, tool-free final answer.
  */
 async function* streamRequiredToolRound(
-  stream: AsyncIterable<Anthropic.Messages.RawMessageStreamEvent>
+  stream: AsyncIterable<RawMessageStreamEvent>
 ): AsyncGenerator<
   StreamDelta,
   { bufferedAnswer: StreamDelta[]; result: RoundResult },
@@ -170,7 +174,7 @@ export async function* streamAnswer(
     const selectedTools = mustCallTool
       ? TOOL_DEFINITIONS.filter((tool) => tool.function.name === requiredTool)
       : TOOL_DEFINITIONS;
-    const tools: Anthropic.Messages.Tool[] = selectedTools.map((tool) => ({
+    const tools: Tool[] = selectedTools.map((tool) => ({
       name: tool.function.name,
       description: tool.function.description,
       input_schema: {
@@ -178,7 +182,7 @@ export async function* streamAnswer(
         required: [...tool.function.parameters.required],
       },
     }));
-    const params: Anthropic.Messages.MessageCreateParamsStreaming = {
+    const params: MessageCreateParamsStreaming = {
       model,
       max_tokens: input.thinking ? MAX_ANSWER_TOKENS + 2048 : MAX_ANSWER_TOKENS,
       system: TEACHER_SYSTEM,
@@ -286,7 +290,7 @@ export async function* streamAnswer(
         executor,
       };
 
-      const result = await awaitBrowserToolResult(requestId, call.id);
+      const result = await awaitBrowserToolResult(requestId, call.id, env.TOOL_RESULTS);
       if (!result.ok) toolExecutionFailed = true;
       console.log(`[tool_result] ${requestId} ${call.name} ok=${result.ok} output=${result.output.slice(0, 120)}`);
 

@@ -26,6 +26,12 @@ export interface Env {
   API_URL?: string;
   /** Override the text reasoning/answering model (see MODELS). */
   API_MODEL?: string;
+  /** EdgeOne Makers KV binding used to bridge browser tool results across isolates. */
+  TOOL_RESULTS?: {
+    get(key: string): Promise<string | null>;
+    put(key: string, value: string): Promise<void>;
+    delete(key: string): Promise<void>;
+  };
   /** R2 bucket for uploaded images (optional). */
   MEDIA_BUCKET?: R2Bucket;
   /** Static assets binding provided by wrangler when assets are configured. */

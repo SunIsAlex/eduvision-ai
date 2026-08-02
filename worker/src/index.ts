@@ -7,7 +7,9 @@ import { resolveModel, type ChatRequest, type Env } from "./types";
 
 const app = new Hono<{ Bindings: Env }>();
 
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
+// EdgeOne Edge Functions accept at most 1 MB request bodies. Keep enough room
+// for base64 expansion, JSON framing, question text and recent history.
+const MAX_IMAGE_BYTES = 700 * 1024;
 
 app.use(
   "*",
@@ -52,7 +54,7 @@ app.post("/api/chat/stream", async (c) => {
   if (image?.startsWith("data:")) {
     const bytes = (image.length * 3) / 4;
     if (bytes > MAX_IMAGE_BYTES) {
-      return c.json({ error: "图片超过 10MB 限制，请压缩后重试" }, 413);
+      return c.json({ error: "图片超过 EdgeOne 请求限制，请压缩后重试" }, 413);
     }
   }
 
@@ -95,7 +97,12 @@ app.post("/api/tool/result", async (c) => {
 
   const output = String(body.output ?? "").slice(0, 20_000);
   const ok = body.ok !== false;
-  const delivered = deliverBrowserToolResult(requestId, toolCallId, { ok, output });
+  const delivered = await deliverBrowserToolResult(
+    requestId,
+    toolCallId,
+    { ok, output },
+    c.env.TOOL_RESULTS
+  );
   if (!delivered) {
     return c.json({ error: "没有等待该工具结果的会话（可能已超时或位于其他实例）" }, 404);
   }
@@ -118,7 +125,7 @@ app.post("/api/upload", async (c) => {
     return c.json({ error: "仅支持图片文件" }, 400);
   }
   if (file.size > MAX_IMAGE_BYTES) {
-    return c.json({ error: "图片超过 10MB 限制" }, 413);
+    return c.json({ error: "图片超过 EdgeOne 请求限制" }, 413);
   }
 
   const bucket = c.env.MEDIA_BUCKET;

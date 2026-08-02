@@ -2,7 +2,9 @@
  * Compress an image client-side so uploads stay small and fast.
  * Draws the source onto a canvas capped at MAX_EDGE and exports JPEG.
  */
-export async function compressImage(file: File, maxEdge = 1600): Promise<File> {
+const EDGEONE_TARGET_BYTES = 600 * 1024;
+
+export async function compressImage(file: File, maxEdge = 1400): Promise<File> {
   const dataUrl = await readAsDataURL(file);
   const img = await loadImage(dataUrl);
   const scale = Math.min(1, maxEdge / Math.max(img.width, img.height));
@@ -16,9 +18,14 @@ export async function compressImage(file: File, maxEdge = 1600): Promise<File> {
   if (!ctx) return file;
   ctx.drawImage(img, 0, 0, w, h);
 
-  const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, "image/jpeg", 0.85)
-  );
+  let quality = 0.82;
+  let blob: Blob | null = null;
+  do {
+    blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", quality)
+    );
+    quality -= 0.1;
+  } while (blob && blob.size > EDGEONE_TARGET_BYTES && quality >= 0.42);
   if (!blob) return file;
   const name = file.name.replace(/\.[^.]+$/, "") + ".jpg";
   return new File([blob], name, { type: "image/jpeg" });
