@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { Send, Square } from "lucide-react";
+import { Brain, Send, Square } from "lucide-react";
 import { ImageUpload } from "./ImageUpload";
 import { cn } from "../lib/utils";
 
@@ -12,6 +12,8 @@ interface Props {
   onStop: () => void;
   loading: boolean;
   disabled?: boolean;
+  thinkingEnabled: boolean;
+  onThinkingEnabledChange: (enabled: boolean) => void;
 }
 
 export function Composer(props: Props) {
@@ -73,9 +75,28 @@ export function Composer(props: Props) {
           {loading ? <Square className="h-4 w-4 fill-current" /> : <Send className="h-4 w-4" />}
         </button>
       </div>
-      <p className="mx-auto mt-2 max-w-3xl text-center text-[11px] text-slate-600">
-        答案由 AI 生成，请核对后再用于作业。支持数学公式（LaTeX）。
-      </p>
+      <div className="mx-auto mt-2 flex max-w-3xl items-center justify-between gap-3">
+        <button
+          type="button"
+          role="switch"
+          aria-checked={props.thinkingEnabled}
+          disabled={loading || disabled}
+          onClick={() => props.onThinkingEnabledChange(!props.thinkingEnabled)}
+          className={cn(
+            "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition disabled:opacity-50",
+            props.thinkingEnabled
+              ? "border-brand-500/70 bg-brand-500/15 text-brand-300"
+              : "border-slate-700 bg-slate-900 text-slate-500 hover:text-slate-300"
+          )}
+          title="开启后 Claude 会花更多时间推理，并显示思考过程"
+        >
+          <Brain className="h-3.5 w-3.5" />
+          深度思考 {props.thinkingEnabled ? "开" : "关"}
+        </button>
+        <p className="text-right text-[11px] text-slate-600">
+          答案由 AI 生成，请核对后再用于作业。支持数学公式（LaTeX）。
+        </p>
+      </div>
     </div>
   );
 }

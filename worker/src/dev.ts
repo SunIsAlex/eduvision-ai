@@ -92,12 +92,9 @@ async function loadDevEnv(): Promise<Env> {
     }
   }
   return {
-    SILICONFLOW_API_KEY:
-      vars.SILICONFLOW_API_KEY ?? process.env.SILICONFLOW_API_KEY ?? "",
-    SILICONFLOW_BASE_URL:
-      vars.SILICONFLOW_BASE_URL ?? process.env.SILICONFLOW_BASE_URL,
-    CORS_ORIGIN: vars.CORS_ORIGIN ?? process.env.CORS_ORIGIN ?? "*",
-    AI_MODEL: vars.AI_MODEL ?? process.env.AI_MODEL,
+    API_KEY: vars.API_KEY ?? process.env.API_KEY ?? "",
+    API_URL: vars.API_URL ?? process.env.API_URL,
+    API_MODEL: vars.API_MODEL ?? process.env.API_MODEL,
   };
 }
 

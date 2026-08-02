@@ -141,6 +141,37 @@ export function ChatMessage({ message, thinking, showDebug = false }: Props) {
           </div>
         )}
 
+        {message.ocr && (
+          <details open className="mb-2 overflow-hidden rounded-lg border border-sky-500/30 bg-slate-900/70">
+            <summary className="flex cursor-pointer select-none items-center gap-2 px-3 py-2 text-xs text-sky-300">
+              <Code className="h-3.5 w-3.5" />
+              题目转写
+              {message.status === "streaming" && !message.reasoning && !message.content && (
+                <span className="flex items-center gap-1 text-[11px] text-sky-400">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  识别中
+                </span>
+              )}
+              <button
+                type="button"
+                title="复制 Markdown 转写"
+                className="ml-auto flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-slate-400 hover:bg-slate-800 hover:text-white"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  void navigator.clipboard.writeText(message.ocr ?? "");
+                }}
+              >
+                <Copy className="h-3 w-3" />
+                复制 Markdown
+              </button>
+            </summary>
+            <div className="border-t border-sky-500/20 px-3 py-2 text-sm text-slate-300">
+              <Markdown content={message.ocr} />
+            </div>
+          </details>
+        )}
+
         {/* Live chain-of-thought streamed from the thinking model. */}
         {message.reasoning && (
           <details

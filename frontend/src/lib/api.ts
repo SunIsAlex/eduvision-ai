@@ -3,6 +3,7 @@ import { runTool } from "./toolRunner";
 
 export interface StreamCallbacks {
   onDebug?: (event: string, data: Record<string, unknown>) => void;
+  onOcr: (delta: string) => void;
   onThinking: (text: string) => void;
   onReasoning: (delta: string) => void;
   onAnswer: (delta: string) => void;
@@ -32,6 +33,7 @@ export async function streamChat(
     image?: string;
     question?: string;
     history: ApiMessage[];
+    thinking?: boolean;
   },
   callbacks: StreamCallbacks,
   signal?: AbortSignal
@@ -118,6 +120,9 @@ async function handleFrame(
         break;
       case "answer":
         if (parsed.text) cb.onAnswer(parsed.text);
+        break;
+      case "ocr":
+        if (parsed.text) cb.onOcr(parsed.text);
         break;
       case "reasoning":
         if (parsed.text) cb.onReasoning(parsed.text);

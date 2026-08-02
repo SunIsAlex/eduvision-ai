@@ -10,6 +10,7 @@ export function useChat() {
   const [image, setImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [thinking, setThinking] = useState<ThinkingStep[]>([]);
+  const [thinkingEnabled, setThinkingEnabled] = useState(false);
   // 上下文断点：之前的 user 消息条数。点击“结束上下文”后，之后的提问
   // 只把断点之后的对话作为历史发送，不再带上前面的题目。
   const [contextBreak, setContextBreak] = useState(0);
@@ -66,7 +67,7 @@ export function useChat() {
 
     try {
       await streamChat(
-        { requestId, image: image ?? undefined, question, history },
+        { requestId, image: image ?? undefined, question, history, thinking: thinkingEnabled },
         {
           onDebug: (event, data) =>
             patch((m) => {
@@ -99,6 +100,10 @@ export function useChat() {
               };
             }),
           onThinking: (text) => setThinking((prev) => [...prev, { text }]),
+          onOcr: (delta) => {
+            setThinking([]);
+            patch((m) => ({ ...m, ocr: (m.ocr ?? "") + delta }));
+          },
           onReasoning: (delta) => {
             setThinking([]);
             patch((m) => ({ ...m, reasoning: (m.reasoning ?? "") + delta }));
@@ -158,7 +163,7 @@ export function useChat() {
       setLoading(false);
       setThinking([]);
     }
-  }, [input, image, loading, messages, contextBreak]);
+  }, [input, image, loading, messages, contextBreak, thinkingEnabled]);
 
   /** 结束当前上下文：断点设在现有对话末尾，下一道题不带前面的上下文。 */
   const endContext = useCallback(() => {
@@ -190,6 +195,8 @@ export function useChat() {
     setImage,
     loading,
     thinking,
+    thinkingEnabled,
+    setThinkingEnabled,
     contextEnded: contextBreak > 0,
     endContext,
     send,

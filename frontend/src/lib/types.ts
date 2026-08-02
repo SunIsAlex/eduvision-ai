@@ -6,6 +6,8 @@ export interface ChatMessage {
   content: string;
   /** Streaming chain-of-thought shown live (assistant only). */
   reasoning?: string;
+  /** Markdown transcription streamed from the image OCR model. */
+  ocr?: string;
   /** Tool calls made while producing this answer (assistant only). */
   tools?: ToolActivity[];
   image?: string;

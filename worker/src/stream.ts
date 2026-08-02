@@ -1,11 +1,12 @@
 import { streamAnswer } from "./reasoning";
-import { MODELS, type ChatRequest, type Env } from "./types";
+import { resolveModel, type ChatRequest, type Env } from "./types";
 
 /** SSE event shapes sent to the browser. */
 export interface StreamEvent {
   event:
     | "thinking"
     | "reasoning"
+    | "ocr"
     | "answer"
     | "tool_call"
     | "tool_result"
@@ -29,8 +30,7 @@ function done(model: string): StreamEvent {
 }
 
 /**
- * Single-model pipeline: one multimodal model reads the image + question and
- * streams the answer. The model's real chain-of-thought is forwarded as
+ * Multimodal reasoning pipeline. Provider reasoning, when present, is forwarded as
  * `reasoning` events (rendered live in the UI); the final answer streams as
  * `answer` events. Every upstream failure is converted into an error event so
  * the chat UI always gets a terminal message.
@@ -39,8 +39,8 @@ export async function* runPipeline(
   env: Env,
   request: ChatRequest
 ): AsyncGenerator<StreamEvent, void, unknown> {
-  if (!env.SILICONFLOW_API_KEY) {
-    yield error("服务端未配置 SILICONFLOW_API_KEY，请联系管理员。");
+  if (!env.API_KEY) {
+    yield error("服务端未配置 API_KEY，请联系管理员。");
     return;
   }
   if (!request.image && !request.question?.trim()) {
@@ -48,8 +48,8 @@ export async function* runPipeline(
     return;
   }
 
-  const model = env.AI_MODEL || MODELS.VISION;
-  yield thinking(request.image ? "正在阅读图片并识别题目…" : "正在理解题目…");
+  const model = resolveModel(env.API_MODEL);
+  yield thinking(request.image ? "正在阅读图片并解题…" : "正在理解题目…");
 
   let emittedContent = false;
   try {
@@ -59,6 +59,7 @@ export async function* runPipeline(
       history: request.history,
       model,
       requestId: request.requestId,
+      thinking: request.thinking === true,
     });
     try {
       for await (const delta of gen) {

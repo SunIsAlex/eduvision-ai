@@ -138,6 +138,8 @@ export default function App() {
         onSubmit={() => void chat.send()}
         onStop={chat.stop}
         loading={chat.loading}
+        thinkingEnabled={chat.thinkingEnabled}
+        onThinkingEnabledChange={chat.setThinkingEnabled}
       />
     </div>
   );

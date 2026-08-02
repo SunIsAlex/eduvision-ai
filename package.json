@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "AI Homework Solver — multimodal Qwen3-VL powered Cloudflare Worker + React frontend",
+  "description": "AI Homework Solver — multimodal Claude powered Cloudflare Worker + React frontend",
   "workspaces": [
     "worker",
     "frontend"

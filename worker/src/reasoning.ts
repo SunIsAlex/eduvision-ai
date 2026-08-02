@@ -1,11 +1,10 @@
-import type OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 import {
   createClient,
   streamRound,
-  visionContent,
   type RoundResult,
   type StreamDelta,
-} from "./siliconflow";
+} from "./anthropic";
 import { TOOL_EXECUTORS, TOOL_DEFINITIONS } from "./tools";
 import { awaitBrowserToolResult } from "./toolbridge";
 import { MODELS, type ChatMessage, type Env } from "./types";
@@ -28,12 +27,6 @@ const TEACHER_SYSTEM = `你是一位严谨、简洁的中学教师。目标是�
 
 const MAX_TOOL_ROUNDS = 3;
 const MAX_CORRECTIONS = 1;
-const INITIAL_THINKING_BUDGET = 1024;
-const FOLLOW_UP_THINKING_BUDGET = 512;
-const CALCULATOR_THINKING_BUDGET = 256;
-const CALCULATOR_FOLLOW_UP_BUDGET = 128;
-const JAVASCRIPT_THINKING_BUDGET = 2048;
-const JAVASCRIPT_FOLLOW_UP_BUDGET = 512;
 const MAX_ANSWER_TOKENS = 4096;
 
 /** 解答文本中出现这些字样，视为声称使用了计算器/工具验证。 */
@@ -66,7 +59,8 @@ function buildMessages(input: {
 
   if (input.history && input.history.length > 0) {
     for (const msg of input.history.slice(-6)) {
-      messages.push(msg);
+      // Historical images are omitted to keep follow-up requests compact.
+      if (msg.content.trim()) messages.push({ role: msg.role, content: msg.content });
     }
   }
 
@@ -86,18 +80,28 @@ function buildMessages(input: {
   return messages;
 }
 
-/** Convert our internal messages into OpenAI-format chat messages. */
-function toOpenAIMessages(
-  messages: ChatMessage[]
-): OpenAI.Chat.ChatCompletionMessageParam[] {
+function imageBlock(image: string): Anthropic.Messages.ImageBlockParam {
+  if (image.startsWith("data:")) {
+    const match = image.match(/^data:(image\/(?:jpeg|png|gif|webp));base64,(.+)$/s);
+    if (!match) throw new Error("不支持的图片 data URL");
+    return {
+      type: "image",
+      source: { type: "base64", media_type: match[1] as "image/jpeg", data: match[2]! },
+    };
+  }
+  return { type: "image", source: { type: "url", url: image } };
+}
+
+/** Convert app messages into Anthropic's native multimodal format. */
+function toAnthropicMessages(messages: ChatMessage[]): Anthropic.Messages.MessageParam[] {
   return messages.map((m) => {
     if (m.image) {
       return {
         role: m.role,
-        content: visionContent(m.content, m.image),
-      } as OpenAI.Chat.ChatCompletionMessageParam;
+        content: [imageBlock(m.image), { type: "text", text: m.content }],
+      };
     }
-    return { role: m.role, content: m.content } as OpenAI.Chat.ChatCompletionMessageParam;
+    return { role: m.role, content: m.content };
   });
 }
 
@@ -107,7 +111,7 @@ function toOpenAIMessages(
  * unverified, tool-free final answer.
  */
 async function* streamRequiredToolRound(
-  stream: AsyncIterable<OpenAI.Chat.ChatCompletionChunk>
+  stream: AsyncIterable<Anthropic.Messages.RawMessageStreamEvent>
 ): AsyncGenerator<
   StreamDelta,
   { bufferedAnswer: StreamDelta[]; result: RoundResult },
@@ -128,10 +132,7 @@ async function* streamRequiredToolRound(
 }
 
 /**
- * Single-model tool-calling pipeline: one multimodal model reads the image
- * (pixels preserved end-to-end), streams its chain of thought, and may call
- * tools. Server-side tools execute immediately; browser tools pause the stream
- * until the browser POSTs the result back, then the model continues.
+ * One multimodal Claude model reads the image, answers, and calls browser tools.
  */
 export async function* streamAnswer(
   env: Env,
@@ -141,22 +142,22 @@ export async function* streamAnswer(
     history?: ChatMessage[];
     model?: string;
     requestId?: string;
+    thinking?: boolean;
   }
 ): AsyncGenerator<StreamDelta, void, unknown> {
-  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-    { role: "system", content: TEACHER_SYSTEM },
-    ...toOpenAIMessages(buildMessages(input)),
-  ];
   const client = createClient(env);
   const model = input.model ?? MODELS.VISION;
   const requestId = input.requestId ?? "local";
+  const messages = toAnthropicMessages(
+    buildMessages({ question: input.question, image: input.image, history: input.history })
+  );
   const javascriptRequired = requiresJavaScript(input.question);
   const calculatorRequired = !javascriptRequired && requiresCalculator(input.question);
   let emptyRounds = 0;
   let toolCallCount = 0;
   let corrections = 0;
   console.log(
-    `[request] ${requestId} model=${model} requiredTool=${javascriptRequired ? "javascript" : calculatorRequired ? "calculator" : "none"} question=${input.question.slice(0, 120)}`
+    `[request] ${requestId} model=${model} requiredTool=${javascriptRequired ? "javascript" : calculatorRequired ? "calculator" : "none"} image=${Boolean(input.image)} question=${input.question.slice(0, 120)}`
   );
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
@@ -166,33 +167,32 @@ export async function* streamAnswer(
         ? "calculator"
         : null;
     const mustCallTool = requiredTool !== null && toolCallCount === 0;
-    const tools = mustCallTool
+    const selectedTools = mustCallTool
       ? TOOL_DEFINITIONS.filter((tool) => tool.function.name === requiredTool)
       : TOOL_DEFINITIONS;
-    const params: OpenAI.Chat.ChatCompletionCreateParamsStreaming & {
-      thinking_budget: number;
-    } = {
+    const tools: Anthropic.Messages.Tool[] = selectedTools.map((tool) => ({
+      name: tool.function.name,
+      description: tool.function.description,
+      input_schema: {
+        ...tool.function.parameters,
+        required: [...tool.function.parameters.required],
+      },
+    }));
+    const params: Anthropic.Messages.MessageCreateParamsStreaming = {
       model,
-      temperature: 0.2,
-      max_tokens: MAX_ANSWER_TOKENS,
-      thinking_budget: javascriptRequired
-        ? round === 0
-          ? JAVASCRIPT_THINKING_BUDGET
-          : JAVASCRIPT_FOLLOW_UP_BUDGET
-        : calculatorRequired
-        ? round === 0
-          ? CALCULATOR_THINKING_BUDGET
-          : CALCULATOR_FOLLOW_UP_BUDGET
-        : round === 0
-          ? INITIAL_THINKING_BUDGET
-          : FOLLOW_UP_THINKING_BUDGET,
+      max_tokens: input.thinking ? MAX_ANSWER_TOKENS + 2048 : MAX_ANSWER_TOKENS,
+      system: TEACHER_SYSTEM,
       stream: true,
       messages,
-      tools: tools as unknown as OpenAI.Chat.ChatCompletionTool[],
+      tools,
+      ...(input.thinking
+        ? { thinking: { type: "enabled" as const, budget_tokens: 2048, display: "summarized" as const } }
+        : { temperature: 0.2 }),
+      ...(mustCallTool && requiredTool
+        ? { tool_choice: { type: "tool" as const, name: requiredTool } }
+        : {}),
     };
-    const stream = await client.chat.completions.create({
-      ...params,
-    });
+    const stream = await client.messages.create(params);
 
     let roundResult: RoundResult;
     if (mustCallTool) {
@@ -251,12 +251,12 @@ export async function* streamAnswer(
               "请立即真实调用 calculator 验算相关数值（引用工具返回结果），然后只输出简短的修正说明" +
               "（如：验算结果：a≈…，b≈…，c≈…，因此结论为…），不要重复完整推导；" +
               "若确实不需要工具，请删去“工具验证/调用计算器”等字样，直接给出推导即可。",
-          } as OpenAI.Chat.ChatCompletionMessageParam);
+          });
           continue;
         }
         return;
       }
-      // 空回合：模型什么都没产出（SiliconFlow 偶发在工具调用前提前断流），
+      // 空回合：上游在工具调用前意外断流时重试，而不是误判为完成。
       // 重试本轮而不是误判为“作答完成”。
       emptyRounds += 1;
       if (emptyRounds >= 2) {
@@ -267,16 +267,11 @@ export async function* streamAnswer(
     emptyRounds = 0;
     toolCallCount += roundResult.toolCalls.length;
 
-    // Assistant message with tool calls, required before tool messages.
+    // Anthropic requires the exact assistant content blocks before tool_result.
     messages.push({
       role: "assistant",
-      content: roundResult.content || null,
-      tool_calls: roundResult.toolCalls.map((call) => ({
-        id: call.id,
-        type: "function",
-        function: { name: call.name, arguments: call.args },
-      })),
-    } as OpenAI.Chat.ChatCompletionMessageParam);
+      content: roundResult.assistantContent,
+    });
 
     let toolExecutionFailed = false;
     for (const call of roundResult.toolCalls) {
@@ -305,14 +300,17 @@ export async function* streamAnswer(
       };
 
       messages.push({
-        role: "tool",
-        tool_call_id: call.id,
-        content: result.ok ? result.output : `工具执行失败：${result.output}`,
-      } as OpenAI.Chat.ChatCompletionMessageParam);
+        role: "user",
+        content: [{
+          type: "tool_result",
+          tool_use_id: call.id,
+          content: result.ok ? result.output : `工具执行失败：${result.output}`,
+          is_error: !result.ok,
+        }],
+      });
     }
 
-    if (javascriptRequired || calculatorRequired) {
-      if (toolExecutionFailed) {
+    if ((javascriptRequired || calculatorRequired) && toolExecutionFailed) {
         messages.push({
           role: "user",
           content: javascriptRequired
@@ -320,13 +318,6 @@ export async function* streamAnswer(
             : "calculator 执行失败。只根据工具返回的真实错误修正表达式并重新调用一次 calculator；不要心算、估算或输出最终答案。",
         });
         continue;
-      }
-      messages.push({
-        role: "user",
-        content: javascriptRequired
-          ? "数值求解结果已经返回。请直接引用根与残差完成最终解答，说明所用方程和最终单位；不要重新手工迭代、估算或从头重复推导。"
-          : "工具结果已经返回。请直接引用该结果完成最终解答；不要重新心算、估算、验算或从头重复推导。",
-      });
     }
   }
 

@@ -16,16 +16,14 @@ not_found_handling = "single-page-application"
 run_worker_first = true
 
 [vars]
-# Frontend origin allowed for CORS. "*" permits any origin (dev only).
-CORS_ORIGIN = "*"
-# Optional SiliconFlow base URL override (defaults to https://api.siliconflow.cn/v1)
-SILICONFLOW_BASE_URL = "https://api.siliconflow.cn/v1"
-# Optional answering model (defaults to zai-org/GLM-5.2).
-AI_MODEL = ""
+# Anthropic-compatible endpoint. The API key remains an encrypted Secret.
+API_URL = "https://api.mytokk.com"
+# Optional model override (defaults to claude-sonnet-4-6).
+API_MODEL = "claude-sonnet-4-6"
 
 # The API key must NEVER be hardcoded. Store it as an encrypted Secret in the
 # Cloudflare dashboard, or set it with:
-#   wrangler secret put SILICONFLOW_API_KEY
+#   wrangler secret put API_KEY
 #
 # R2 bucket for uploaded homework images.
 # Create one with:  wrangler r2 bucket create eduvision-media

@@ -1,6 +1,6 @@
 # EduVision AI · 拍照搜题
 
-生产级多模态 AI 作业解答应用（类似「作业帮拍照搜题」）。学生上传作业照片，**一个多模态模型直接读图 + 做题 + 老师式分步讲解**，通过 SSE 实时流式返回（支持 Markdown + LaTeX）。架构刻意保持简单：无 OCR 降级、无多模型编排。
+生产级 AI 作业解答应用（类似「作业帮拍照搜题」）。学生上传作业照片后，由 Claude Sonnet 直接读图、解题并调用工具，通过 SSE 实时流式返回（支持 Markdown + LaTeX）。
 
 ## 架构
 
@@ -11,26 +11,29 @@
 Cloudflare Worker (Hono + TypeScript)
         │
         ▼
-  单模型：zai-org/GLM-5.2（默认，可用 AI_MODEL 覆盖）
-        │  原始图片像素端到端保留，直接读图作答
+  MyTokk Anthropic Messages API
+        │
+        ▼
+  claude-sonnet-4-6：读图、推理、解题与工具调用
         ▼
    SSE 事件流：thinking → reasoning → [tool_call → 浏览器执行 → tool_result] → answer → done
 ```
 
 核心原则：
 
-- **不降级**：不走「图片 → OCR → 文本 → LLM」。多模态模型直接看原始图片（几何图形、函数图像、实验装置、化学结构、表格、手写体），图片上下文全程保留。
-- **不编排**：不做视觉分析、路由、检索增强等多步链路——一个模型、一次流式调用，读完图直接讲题。
-- **思维链实时可见**：思考模型的原始 `reasoning_content` 以 `reasoning` 事件逐字流式推送，前端"思考过程"面板实时展开；最终解答通过 `answer` 事件流式输出。
+- **单模型多模态**：Claude 原生接收图片，不需要 OCR 中转，避免转写丢失公式或图形关系。
+- **可调试**：调试面板记录每一轮模型响应、停止原因和工具调用。
+- **实时输出**：最终解答通过 `answer` 事件逐字流式输出；上游若提供 reasoning delta，也会通过 `reasoning` 事件展示。
 - **零成本工具**：计算器（加固版 mathjs）与枚举计数代码（JS）都在**用户浏览器本地**执行——Worker 不装任何代码执行引擎，脚本体积小、不耗服务器 CPU；界面明确提示「风险自负」。
 
 ## 功能
 
 - 拍照/拖拽上传题目图片，客户端自动压缩后上传
-- 一个多模态模型读图 + 作答 + 老师式分步讲解（Markdown + LaTeX 公式渲染）
+- Claude Sonnet 原生读图、作答和老师式分步讲解（Markdown + LaTeX 公式渲染）
+- 输入区提供“深度思考”开关：关闭时低延迟作答，开启时流式展示 Claude extended thinking 摘要
 - SSE 流式输出：`thinking`（开始提示）→ `reasoning`（思维链逐字实时显示）→ `answer`（解题内容逐字输出）→ `done`；模型调用工具时中间插入 `tool_call` / `tool_result` 事件
 - 工具支持：`calculator`（精确数学计算，mathjs 加固沙箱）与 `javascript`（Web Worker 沙箱数值求根、平衡方程迭代、枚举/计数），工具调用与结果在聊天中可视化展示
-- 按题目难度自适应讲解，限制无效思考（普通题首轮/后续 1024/512 token，强制计算器题 256/128 token；回答上限 4096 token）
+- 按题目难度自适应讲解，回答上限 4096 token
 - 移动端响应式聊天界面，API Key 只在 Worker Secret 中
 
 ## 目录结构
@@ -43,7 +46,7 @@ Cloudflare Worker (Hono + TypeScript)
 ├── worker/
 │   └── src/
 │       ├── index.ts         # Hono 入口：/api/chat/stream、/api/tool/result、/api/upload、/health、/media/*
-│       ├── siliconflow.ts   # SiliconFlow OpenAI 兼容客户端封装 + 流式内容提取
+│       ├── anthropic.ts     # Anthropic 原生客户端封装 + 流式内容/工具提取
 │       ├── reasoning.ts     # 单模型流式作答 + 工具调用循环（图片 + 文本 + 历史）
 │       ├── stream.ts        # SSE 事件流编排 + 心跳
 │       ├── types.ts         # 共享类型与模型常量
@@ -62,11 +65,11 @@ Cloudflare Worker (Hono + TypeScript)
 
 ## 快速开始
 
-前置：Node ≥ 20、npm ≥ 10。需要 [SiliconFlow](https://cloud.siliconflow.cn) API Key（默认模型 `zai-org/GLM-5.2`，可在 `.dev.vars` 中用 `AI_MODEL` 覆盖）。
+前置：Node ≥ 20、npm ≥ 10。需要 MyTokk API Key（默认模型 `claude-sonnet-4-6`，可在 `.dev.vars` 中用 `API_MODEL` 覆盖）。
 
 ```bash
 npm install
-cp .env.example .dev.vars   # 填入 SILICONFLOW_API_KEY
+cp .env.example .dev.vars   # 填入 API_KEY
 npm run dev                 # 打开 http://localhost:5173
 ```
 
@@ -82,12 +85,12 @@ npm run dev                 # 打开 http://localhost:5173
 ```bash
 npm run build                       # 类型检查 + 构建前端静态资源
 wrangler login
-wrangler secret put SILICONFLOW_API_KEY   # 生产环境密钥，绝不写入代码
+wrangler secret put API_KEY   # 生产环境密钥，绝不写入代码
 npm run deploy                      # 构建前端并部署 Worker（静态资源自动托管）
 ```
 
 通过 Cloudflare Git 集成自动部署时，请在 Worker 的 **Settings → Variables and
-Secrets** 中把 `SILICONFLOW_API_KEY` 添加为 **Secret**。`wrangler.toml` 已启用
+Secrets** 中把 `API_KEY` 添加为 **Secret**。`wrangler.toml` 已启用
 `keep_vars = true`，Git push / Wrangler deploy 会保留 Dashboard 中配置的变量。
 
 部署成功后：
@@ -120,7 +123,7 @@ Secrets** 中把 `SILICONFLOW_API_KEY` 添加为 **Secret**。`wrangler.toml` �
 | `tool_call` | `{"toolCallId":"…","name":"calculator","args":"{\"expression\":\"123*456\"}","executor":"browser"}` | 模型请求调用工具；浏览器执行完毕后 POST `/api/tool/result` |
 | `tool_result` | `{"toolCallId":"…","name":"calculator","ok":true,"output":"56088"}` | 工具执行结果（随后模型会继续流式推理/作答） |
 | `answer` | `{"text":"先观察系数：…"}` | 逐段推送的解答内容 |
-| `done` | `{"pipeline":"multimodal","model":"zai-org/GLM-5.2"}` | 管线结束 |
+| `done` | `{"pipeline":"multimodal","model":"claude-sonnet-4-6"}` | 管线结束 |
 | `error` | `{"text":"…"}` | 错误信息（保证最终能收到终止事件） |
 
 ### `POST /api/tool/result`
@@ -158,27 +161,22 @@ multipart 表单，字段 `file`（图片 ≤ 10MB）。配置 R2 后返回 `{ur
 
 | 模型 ID | 说明 |
 | --- | --- |
-| `zai-org/GLM-5.2`（默认） | 复杂数值推理与工具调用已通过本项目端到端测试 |
-| `Qwen/Qwen3.5-397B-A17B`（可选） | 原生多模态；复杂数值题的工具规划与 JavaScript 生成稳定 |
-| `Qwen/Qwen3-VL-32B-Thinking`（低成本可选） | 多模态读图与思维链正常，但复杂 JavaScript 工具代码的可靠性较低 |
-| `Qwen/Qwen3-VL-30B-A3B-Thinking`（低成本可选） | 更轻量的 MoE 版本 |
-
-> 注意：Qwen3-VL 的 **Instruct** 系列（`Qwen3-VL-32B-Instruct`、`Qwen3-VL-30B-A3B-Instruct` 等）当前在 SiliconFlow 上存在兼容问题——工具结果回填后模型会返回空内容，无法完成工具管线，**不要选用**；需要切换模型时在 `.dev.vars` / wrangler vars 中设置 `AI_MODEL`。
+| `claude-sonnet-4-6`（默认） | 原生多模态、流式响应与工具调用均已通过端到端测试 |
 
 ## 安全说明
 
-- `SILICONFLOW_API_KEY` 只通过 `wrangler secret put` 注入，前端与仓库均不包含真实密钥
+- `API_KEY` 只通过 `wrangler secret put` 注入，前端与仓库均不包含真实密钥
 - 输入校验：仅接受 `data:image/*` 与 `https://` 图片，限制 10MB，非法 JSON 返回 400
 - 计算器按 mathjs 官方安全建议加固，并叠加表达式长度 / 节点数 / 重函数参数 / 结果规模限制；`/api/tool/result` 校验 `requestId` / `toolCallId` 格式并截断输出上限 20KB
 - JavaScript 工具在 Web Worker 中执行（无 DOM、无页面上下文），禁用网络与 `importScripts`，超时自动终止——残余风险由用户承担（界面明示）
-- 思维链（`reasoning_content`）按产品需求实时展示给用户；最终解答为 `content`
+- 最终解答实时展示；调试面板可查看每轮原始响应和工具调用
 - 所有上游失败都收敛为 SSE `error` 事件，不会泄漏内部堆栈
 
 ## 常见问题
 
-**本地报「服务端未配置 SILICONFLOW_API_KEY」**：把 Key 写入项目根目录 `.dev.vars` 后重启。
+**本地报「服务端未配置 API_KEY」**：把 Key 写入项目根目录 `.dev.vars` 后重启。
 
-**需要降低模型成本**：可在 `.dev.vars` 中设置 `AI_MODEL=Qwen/Qwen3-VL-32B-Thinking`；复杂平衡方程的工具代码生成可靠性会相应降低。
+**需要切换模型**：可在 `.dev.vars` 中设置 `API_MODEL` 为当前账号可用的 Anthropic 模型 ID；模型必须支持图片和工具调用。
 
 **wrangler 装不上**：Android/Termux 不支持 `workerd`，请使用 `npm run dev`（Node 服务器）；部署在 macOS/Linux/Windows 完成。
 

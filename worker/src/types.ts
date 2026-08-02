@@ -14,17 +14,18 @@ export interface ChatRequest {
   image?: string;
   question?: string;
   history?: ChatMessage[];
+  /** User-controlled Claude extended-thinking mode. */
+  thinking?: boolean;
   /** Client-generated id used to correlate browser tool results back to this stream. */
   requestId?: string;
 }
 
 /** Environment bindings declared in wrangler.toml. */
 export interface Env {
-  SILICONFLOW_API_KEY: string;
-  SILICONFLOW_BASE_URL?: string;
-  CORS_ORIGIN?: string;
-  /** Override the single multimodal answering model (see MODELS). */
-  AI_MODEL?: string;
+  API_KEY: string;
+  API_URL?: string;
+  /** Override the text reasoning/answering model (see MODELS). */
+  API_MODEL?: string;
   /** R2 bucket for uploaded images (optional). */
   MEDIA_BUCKET?: R2Bucket;
   /** Static assets binding provided by wrangler when assets are configured. */
@@ -32,12 +33,16 @@ export interface Env {
 }
 
 /**
- * One model does everything: reads the image (pixels preserved end-to-end)
- * and produces the teacher-style explanation. Override via AI_MODEL.
+ * One multimodal Anthropic model handles text, images, reasoning and tools.
  */
 export const MODELS = {
-  // GLM-5.2：复杂数值推理与工具调用已通过本项目端到端测试。
-  VISION: "zai-org/GLM-5.2",
+  VISION: "claude-sonnet-4-6",
 } as const;
 
-export const DEFAULT_BASE_URL = "https://api.siliconflow.cn/v1";
+/** Ignore stale SiliconFlow model overrides when using the Anthropic endpoint. */
+export function resolveModel(configured?: string): string {
+  const model = configured?.trim();
+  return model?.startsWith("claude-") ? model : MODELS.VISION;
+}
+
+export const DEFAULT_BASE_URL = "https://api.mytokk.com";

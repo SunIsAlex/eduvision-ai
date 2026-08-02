@@ -3,7 +3,7 @@ import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
 import { runPipeline } from "./stream";
 import { deliverBrowserToolResult } from "./toolbridge";
-import { MODELS, type ChatRequest, type Env } from "./types";
+import { resolveModel, type ChatRequest, type Env } from "./types";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -12,10 +12,8 @@ const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 app.use(
   "*",
   cors({
-    origin: (origin, c) => {
-      const allowed = c.env.CORS_ORIGIN ?? "*";
-      if (allowed === "*") return "*";
-      return allowed.split(",").includes(origin) ? origin : allowed;
+    origin: () => {
+      return "*";
     },
     allowHeaders: ["Content-Type"],
     allowMethods: ["GET", "POST", "OPTIONS"],
@@ -27,7 +25,7 @@ app.get("/health", (c) =>
     status: "ok",
     service: "eduvision-ai",
     models: {
-      answer: c.env.AI_MODEL || MODELS.VISION,
+      answer: resolveModel(c.env.API_MODEL),
     },
     uploads: Boolean(c.env.MEDIA_BUCKET),
     timestamp: new Date().toISOString(),
