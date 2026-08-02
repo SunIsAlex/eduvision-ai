@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Bot, Brain, Calculator, Check, Code, Loader2, TriangleAlert, User } from "lucide-react";
+import { Bot, Brain, Calculator, Check, Code, Copy, Loader2, TriangleAlert, User } from "lucide-react";
 import { Markdown } from "./Markdown";
 import type { ChatMessage as Message, ThinkingStep } from "../lib/types";
 import { cn } from "../lib/utils";
@@ -7,6 +7,7 @@ import { cn } from "../lib/utils";
 interface Props {
   message: Message;
   thinking?: ThinkingStep[];
+  showDebug?: boolean;
 }
 
 const PIPELINE_LABELS: Record<string, string> = {
@@ -80,7 +81,7 @@ function CalculatorExpression({ raw }: { raw: string }) {
   );
 }
 
-export function ChatMessage({ message, thinking }: Props) {
+export function ChatMessage({ message, thinking, showDebug = false }: Props) {
   const isUser = message.role === "user";
   const reasoningRef = useRef<HTMLDivElement>(null);
 
@@ -216,6 +217,30 @@ export function ChatMessage({ message, thinking }: Props) {
               代码在你的浏览器本地沙箱中执行 · 风险自负
             </p>
           </div>
+        )}
+
+        {showDebug && (
+          <details open className="mb-2 overflow-hidden rounded-lg border border-amber-500/30 bg-slate-950/90">
+            <summary className="flex cursor-pointer select-none items-center gap-2 px-3 py-2 text-xs text-amber-300">
+              <Code className="h-3.5 w-3.5" />
+              原始响应事件（{message.debugEvents?.length ?? 0}）
+              <button
+                type="button"
+                className="ml-auto flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-slate-400 hover:bg-slate-800 hover:text-white"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  void navigator.clipboard.writeText(JSON.stringify(message.debugEvents ?? [], null, 2));
+                }}
+              >
+                <Copy className="h-3 w-3" />
+                复制
+              </button>
+            </summary>
+            <pre className="scrollbar-thin max-h-96 overflow-auto whitespace-pre-wrap border-t border-amber-500/20 px-3 py-2 font-mono text-[11px] leading-4 text-slate-300">
+              {JSON.stringify(message.debugEvents ?? [], null, 2)}
+            </pre>
+          </details>
         )}
 
         <div

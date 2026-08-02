@@ -11,7 +11,7 @@
 Cloudflare Worker (Hono + TypeScript)
         │
         ▼
-  单模型：Qwen/Qwen3.5-397B-A17B（默认，可用 AI_MODEL 覆盖）
+  单模型：zai-org/GLM-5.2（默认，可用 AI_MODEL 覆盖）
         │  原始图片像素端到端保留，直接读图作答
         ▼
    SSE 事件流：thinking → reasoning → [tool_call → 浏览器执行 → tool_result] → answer → done
@@ -62,7 +62,7 @@ Cloudflare Worker (Hono + TypeScript)
 
 ## 快速开始
 
-前置：Node ≥ 20、npm ≥ 10。需要 [SiliconFlow](https://cloud.siliconflow.cn) API Key（默认模型 `Qwen/Qwen3.5-397B-A17B`，可在 `.dev.vars` 中用 `AI_MODEL` 覆盖）。
+前置：Node ≥ 20、npm ≥ 10。需要 [SiliconFlow](https://cloud.siliconflow.cn) API Key（默认模型 `zai-org/GLM-5.2`，可在 `.dev.vars` 中用 `AI_MODEL` 覆盖）。
 
 ```bash
 npm install
@@ -85,6 +85,10 @@ wrangler login
 wrangler secret put SILICONFLOW_API_KEY   # 生产环境密钥，绝不写入代码
 npm run deploy                      # 构建前端并部署 Worker（静态资源自动托管）
 ```
+
+通过 Cloudflare Git 集成自动部署时，请在 Worker 的 **Settings → Variables and
+Secrets** 中把 `SILICONFLOW_API_KEY` 添加为 **Secret**。`wrangler.toml` 已启用
+`keep_vars = true`，Git push / Wrangler deploy 会保留 Dashboard 中配置的变量。
 
 部署成功后：
 
@@ -116,7 +120,7 @@ npm run deploy                      # 构建前端并部署 Worker（静态资�
 | `tool_call` | `{"toolCallId":"…","name":"calculator","args":"{\"expression\":\"123*456\"}","executor":"browser"}` | 模型请求调用工具；浏览器执行完毕后 POST `/api/tool/result` |
 | `tool_result` | `{"toolCallId":"…","name":"calculator","ok":true,"output":"56088"}` | 工具执行结果（随后模型会继续流式推理/作答） |
 | `answer` | `{"text":"先观察系数：…"}` | 逐段推送的解答内容 |
-| `done` | `{"pipeline":"multimodal","model":"Qwen/Qwen3.5-397B-A17B"}` | 管线结束 |
+| `done` | `{"pipeline":"multimodal","model":"zai-org/GLM-5.2"}` | 管线结束 |
 | `error` | `{"text":"…"}` | 错误信息（保证最终能收到终止事件） |
 
 ### `POST /api/tool/result`
@@ -154,7 +158,8 @@ multipart 表单，字段 `file`（图片 ≤ 10MB）。配置 R2 后返回 `{ur
 
 | 模型 ID | 说明 |
 | --- | --- |
-| `Qwen/Qwen3.5-397B-A17B`（默认） | 原生多模态；复杂数值题的工具规划与 JavaScript 生成更稳定，AgCl 平衡方程工具调用已实测通过 |
+| `zai-org/GLM-5.2`（默认） | 复杂数值推理与工具调用已通过本项目端到端测试 |
+| `Qwen/Qwen3.5-397B-A17B`（可选） | 原生多模态；复杂数值题的工具规划与 JavaScript 生成稳定 |
 | `Qwen/Qwen3-VL-32B-Thinking`（低成本可选） | 多模态读图与思维链正常，但复杂 JavaScript 工具代码的可靠性较低 |
 | `Qwen/Qwen3-VL-30B-A3B-Thinking`（低成本可选） | 更轻量的 MoE 版本 |
 

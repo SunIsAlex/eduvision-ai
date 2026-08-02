@@ -36,9 +36,8 @@ export interface Env {
  * and produces the teacher-style explanation. Override via AI_MODEL.
  */
 export const MODELS = {
-  // Qwen3.5-397B：原生多模态；复杂数值题的工具规划与 JavaScript 生成
-  // 比旧的 Qwen3-VL-32B-Thinking 稳定。仍可通过 AI_MODEL 覆盖。
-  VISION: "Qwen/Qwen3.5-397B-A17B",
+  // GLM-5.2：复杂数值推理与工具调用已通过本项目端到端测试。
+  VISION: "zai-org/GLM-5.2",
 } as const;
 
 export const DEFAULT_BASE_URL = "https://api.siliconflow.cn/v1";

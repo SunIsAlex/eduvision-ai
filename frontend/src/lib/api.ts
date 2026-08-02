@@ -2,6 +2,7 @@ import type { ApiMessage } from "./types";
 import { runTool } from "./toolRunner";
 
 export interface StreamCallbacks {
+  onDebug?: (event: string, data: Record<string, unknown>) => void;
   onThinking: (text: string) => void;
   onReasoning: (delta: string) => void;
   onAnswer: (delta: string) => void;
@@ -110,6 +111,7 @@ async function handleFrame(
       ok?: boolean;
       output?: string;
     };
+    cb.onDebug?.(event, parsed as Record<string, unknown>);
     switch (event) {
       case "thinking":
         if (parsed.text) cb.onThinking(parsed.text);

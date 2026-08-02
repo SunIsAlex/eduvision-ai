@@ -68,6 +68,36 @@ export function useChat() {
       await streamChat(
         { requestId, image: image ?? undefined, question, history },
         {
+          onDebug: (event, data) =>
+            patch((m) => {
+              const events = m.debugEvents ?? [];
+              const previous = events[events.length - 1];
+              // Token streams arrive as many tiny events. Merge adjacent text
+              // deltas so the debug panel remains readable and lightweight.
+              if (
+                previous?.event === event &&
+                typeof previous.data.text === "string" &&
+                typeof data.text === "string"
+              ) {
+                return {
+                  ...m,
+                  debugEvents: [
+                    ...events.slice(0, -1),
+                    {
+                      ...previous,
+                      data: { ...previous.data, text: previous.data.text + data.text },
+                    },
+                  ],
+                };
+              }
+              return {
+                ...m,
+                debugEvents: [
+                  ...events,
+                  { event, data, at: new Date().toISOString() },
+                ],
+              };
+            }),
           onThinking: (text) => setThinking((prev) => [...prev, { text }]),
           onReasoning: (delta) => {
             setThinking([]);

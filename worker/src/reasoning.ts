@@ -22,7 +22,9 @@ const TEACHER_SYSTEM = `你是一位严谨、简洁的中学教师。目标是�
 7. 一次工具调用能完成时不要拆成多轮。工具失败时最多修正重试一次，仍失败才改为直接推导或说明限制。
 8. 严禁虚构工具调用。只有真实调用并拿到结果后，才可以写“工具验证”或引用工具结果；纯符号推导、公式变形和概念解释不调用工具。
 9. 默认使用中文、Markdown 和 LaTeX（行内 $...$，独立行 $$...$$）。避免固定套话和过度分段；结论要明确。英文题保留必要的英文术语并用中文解释。
-10. 若用户明确要求详细推导、证明、所有情况或指定工具，则服从该要求，但仍避免重复内容。`;
+10. 若用户明确要求详细推导、证明、所有情况或指定工具，则服从该要求，但仍避免重复内容。
+11. 数值求解输出前必须做通用一致性检查：正文方程、工具代码和验证式必须一致；重新枚举守恒式涉及的全部物种或变量，逐项代回并报告以主要量级为分母的相对残差（理论残差为 0 时禁止除以 0）。任一关键相对残差大于 1e-6、左右两边明显不等或量纲不一致时，必须修正后重算，不能宣称结果可靠。
+12. 复杂方程优先代数消元并降为单变量有界求根；确实无法降维才使用带物理约束、阻尼和收敛检查的多元算法。一次 javascript 应同时输出结果和全部关键残差；若已用完整精度验证通过，calculator 最多做 1～2 个独立抽查，不重复计算由定义直接得到的量。`;
 
 const MAX_TOOL_ROUNDS = 3;
 const MAX_CORRECTIONS = 1;
@@ -216,6 +218,17 @@ export async function* streamAnswer(
     } else {
       roundResult = yield* streamRound(stream);
     }
+
+    // Round-level provider response for the opt-in frontend debug panel. This
+    // includes drafts suppressed by the required-tool policy.
+    yield {
+      kind: "debug",
+      round: round + 1,
+      finishReason: roundResult.finishReason,
+      reasoning: roundResult.reasoning,
+      content: roundResult.content,
+      toolCalls: roundResult.toolCalls,
+    };
 
     // No tool calls: the answer is complete.
     if (roundResult.toolCalls.length === 0) {

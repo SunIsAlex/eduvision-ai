@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef } from "react";
-import { GraduationCap, RotateCcw, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Bug, GraduationCap, RotateCcw, Sparkles } from "lucide-react";
 import { Composer } from "./components/Composer";
 import { ChatMessage } from "./components/ChatMessage";
 import { useChat } from "./hooks/useChat";
@@ -12,6 +12,7 @@ const EXAMPLES = [
 
 export default function App() {
   const chat = useChat();
+  const [debug, setDebug] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
   // Whether the user is pinned to the bottom of the message list. While
   // streaming, we only auto-scroll when they're already at/near the bottom,
@@ -55,8 +56,23 @@ export default function App() {
               <p className="text-[11px] text-slate-500">拍照搜题 · 多模态智能解题</p>
             </div>
           </div>
-          {chat.messages.length > 0 && (
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setDebug((value) => !value)}
+                title="显示服务端流式事件、工具参数和模型响应"
+                aria-pressed={debug}
+                className={
+                  debug
+                    ? "flex items-center gap-1.5 rounded-lg border border-amber-500/60 bg-amber-500/10 px-2.5 py-1.5 text-xs text-amber-300"
+                    : "flex items-center gap-1.5 rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs text-slate-400 transition hover:border-slate-500 hover:text-slate-200"
+                }
+              >
+                <Bug className="h-3.5 w-3.5" />
+                调试
+              </button>
+            {chat.messages.length > 0 && (
+              <>
               <button
                 type="button"
                 onClick={chat.endContext}
@@ -78,8 +94,9 @@ export default function App() {
                 <RotateCcw className="h-3.5 w-3.5" />
                 新对话
               </button>
-            </div>
-          )}
+              </>
+            )}
+          </div>
         </div>
       </header>
 
@@ -97,6 +114,7 @@ export default function App() {
               <ChatMessage
                 key={m.id}
                 message={m}
+                showDebug={debug}
                 thinking={
                   m.role === "assistant" &&
                   m.status === "streaming" &&

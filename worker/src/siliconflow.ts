@@ -37,6 +37,14 @@ export type StreamDelta =
   | { kind: "reasoning"; text: string }
   | { kind: "content"; text: string }
   | {
+      kind: "debug";
+      round: number;
+      finishReason: string | null;
+      reasoning: string;
+      content: string;
+      toolCalls: ToolCallParts[];
+    }
+  | {
       kind: "tool_call";
       requestId: string;
       toolCallId: string;

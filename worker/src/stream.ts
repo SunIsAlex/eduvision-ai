@@ -9,6 +9,7 @@ export interface StreamEvent {
     | "answer"
     | "tool_call"
     | "tool_result"
+    | "debug"
     | "done"
     | "error";
   data: string;
@@ -86,6 +87,17 @@ export async function* runPipeline(
               name: delta.name,
               ok: delta.ok,
               output: delta.output,
+            }),
+          };
+        } else if (delta.kind === "debug") {
+          yield {
+            event: "debug",
+            data: JSON.stringify({
+              round: delta.round,
+              finishReason: delta.finishReason,
+              reasoning: delta.reasoning,
+              content: delta.content,
+              toolCalls: delta.toolCalls,
             }),
           };
         }

@@ -14,6 +14,14 @@ export interface ChatMessage {
   model?: string;
   error?: boolean;
   status?: "streaming" | "done" | "error";
+  /** Raw SSE event timeline, only rendered when the debug panel is enabled. */
+  debugEvents?: DebugEvent[];
+}
+
+export interface DebugEvent {
+  event: string;
+  data: Record<string, unknown>;
+  at: string;
 }
 
 export interface ThinkingStep {

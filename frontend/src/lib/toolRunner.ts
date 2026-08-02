@@ -57,13 +57,17 @@ export function runJavaScript(code: string): Promise<ToolResult> {
       self.fetch = () => { throw new Error("网络访问已禁用"); };
       self.XMLHttpRequest = undefined;
       self.importScripts = () => { throw new Error("importScripts 已禁用"); };
-      try {
-        ${code}
-      } catch (err) {
-        self.postMessage({ type: "error", text: String((err && err.message) || err) });
-        return;
-      }
-      self.postMessage({ type: "done" });
+      (() => {
+        try {
+          (() => {
+            ${code}
+          })();
+        } catch (err) {
+          self.postMessage({ type: "error", text: String((err && err.message) || err) });
+          return;
+        }
+        self.postMessage({ type: "done" });
+      })();
     `;
 
     const url = URL.createObjectURL(new Blob([shim], { type: "text/javascript" }));
