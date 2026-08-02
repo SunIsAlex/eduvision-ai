@@ -156,8 +156,8 @@ app.get("/media/:key", async (c) => {
 });
 
 /**
- * SPA fallback: in dev (no assets binding) return a hint; in production
- * wrangler's static assets handle non-API routes before the worker anyway.
+ * Serve the SPA through Wrangler's static-assets binding. `run_worker_first`
+ * keeps API routes in this Worker, so non-API requests must be forwarded here.
  */
 app.get("*", (c) => {
   if (c.env.ASSETS) return c.env.ASSETS.fetch(c.req.raw);

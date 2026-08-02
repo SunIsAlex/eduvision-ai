@@ -3,10 +3,11 @@ main = "worker/src/index.ts"
 compatibility_date = "2025-02-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Serve the built React app as static assets.
-# "run_worker_first" routes /api/* to the Worker and everything else to the SPA.
+# Serve the built React app as static assets. Because every request reaches the
+# Worker first, the catch-all route forwards non-API requests through ASSETS.
 [assets]
 directory = "./frontend/dist"
+binding = "ASSETS"
 not_found_handling = "single-page-application"
 run_worker_first = true
 
