@@ -162,7 +162,7 @@ app.get("/media/:key", async (c) => {
 app.get("*", (c) => {
   if (c.env.ASSETS) return c.env.ASSETS.fetch(c.req.raw);
   return c.text(
-    "EduVision AI worker 运行正常。前端开发服务器请访问 http://localhost:5173"
+    "EduVision AI worker 运行正常（未配置静态资源）。前端界面由构建后的 frontend/dist 提供，请访问根路径；开发模式请访问 http://localhost:5173"
   );
 });
 
