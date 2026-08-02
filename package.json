@@ -1,0 +1,29 @@
+{
+  "name": "eduvision-ai",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AI Homework Solver — multimodal Qwen3-VL powered Cloudflare Worker + React frontend",
+  "workspaces": [
+    "worker",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently -n worker,frontend -c blue,green \"npm:dev:worker:node\" \"npm:dev:frontend\"",
+    "dev:cf": "concurrently -n worker,frontend -c blue,green \"npm:dev:worker:cf\" \"npm:dev:frontend\"",
+    "dev:worker:node": "npm run dev:node --workspace worker",
+    "dev:worker:cf": "npm run dev --workspace worker",
+    "dev:frontend": "npm run dev --workspace frontend",
+    "build": "npm run typecheck && npm run build --workspace frontend",
+    "typecheck": "npm run typecheck --workspace worker && npm run typecheck --workspace frontend",
+    "test:tools": "tsx worker/scripts/tools-e2e.ts",
+    "deploy": "npm run build --workspace frontend && npm run deploy --workspace worker",
+    "seed": "npm run seed --workspace worker"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

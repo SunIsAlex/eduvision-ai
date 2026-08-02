@@ -1,0 +1,29 @@
+name = "eduvision-ai"
+main = "worker/src/index.ts"
+compatibility_date = "2025-02-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Serve the built React app as static assets.
+# "run_worker_first" routes /api/* to the Worker and everything else to the SPA.
+[assets]
+directory = "./frontend/dist"
+not_found_handling = "single-page-application"
+run_worker_first = true
+
+[vars]
+# Frontend origin allowed for CORS. "*" permits any origin (dev only).
+CORS_ORIGIN = "*"
+# Optional SiliconFlow base URL override (defaults to https://api.siliconflow.cn/v1)
+SILICONFLOW_BASE_URL = "https://api.siliconflow.cn/v1"
+# Optional: single multimodal answering model (defaults to Qwen3-VL-8B-Thinking).
+AI_MODEL = ""
+
+# The API key must NEVER be hardcoded. Set it with:
+#   wrangler secret put SILICONFLOW_API_KEY
+#
+# R2 bucket for uploaded homework images.
+# Create one with:  wrangler r2 bucket create eduvision-media
+# [r2_buckets]
+# [[r2_buckets]]
+# binding = "MEDIA_BUCKET"
+# bucket_name = "eduvision-media"
