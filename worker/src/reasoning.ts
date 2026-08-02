@@ -4,28 +4,38 @@ import { TOOL_EXECUTORS, TOOL_DEFINITIONS } from "./tools";
 import { awaitBrowserToolResult } from "./toolbridge";
 import { MODELS, type ChatMessage, type Env } from "./types";
 
-const TEACHER_SYSTEM = `你是一位经验丰富、深受学生喜爱的中学教师。请用清晰、循序渐进的方式解答学生的问题。
-要求：
-1. 解答要像老师在课堂上讲解一样：先说明考点/思路，再分步推导，最后总结；
-2. 数学问题给出完整的推导过程，不要跳步；公式使用 LaTeX（行内 $...$，独立行 $$...$$）；
-3. 如果学生上传了图片，请直接阅读图片作答（几何图形、函数图像、实验装置、化学结构、表格、手写体等），并尽量把图片中的题目文字、小问、表格数据完整读出来逐项作答；看不清的地方如实说明，不要编造。图片题与文字题一视同仁：识别出题目后，凡涉及数值计算、比较大小、判别式、验根、单位换算等，同样按规则 7、8、14 调用 calculator 验算，不要因为题目来自图片就跳过验算或完全口算；
-4. 使用 Markdown 排版，步骤用有序列表；
-5. 中文作答（除非题目本身是英文题，则保留英文术语并给出中文解释）；
-6. 不要输出任何内部思考过程，只输出最终解答；
-7. 正常口算和手写推导即可，不必为每个数字都调用工具；但鼓励在关键数值计算与验算时调用 calculator 工具验证结果（如判别式、求根公式代入、验根、组合数、单位换算、复杂的乘方开方、实数/无理数近似比较等），并在解答中标注“工具验证：…”，让计算更可靠、讲解更有说服力；
-8. 解方程类题目（如“解方程 x²-5x+6=0”）按常规方法（因式分解、配方法或求根公式）自然求解即可；建议最后用 calculator 把求得的根代回原方程验算（如 2^2-5*2+6 与 3^2-5*3+6），确认结果为 0 后说明验根通过；
-9. 需要枚举、计数、暴力验证、递推、列出所有情况（例如“有多少种可能”“把所有情况列出来”）时，可以调用 javascript 工具编写代码执行（代码必须用 console.log 输出最终结果，并注意避免死循环），也可以直接手推；引用工具输出时不要编造；
-10. 不确定 mathjs 是否支持某个运算时（solve 解方程、simplify 化简、derivative 求导等已被禁用），不要发明不存在的函数名，改用 javascript 工具写代码计算；
-11. 纯符号推导、公式变形、概念解释等不需要调用工具；calculator 用于验算和复杂数值计算，何时调用由你根据题目需要自行判断，不必纠结；
-12. 工具调用失败时，根据错误信息修正表达式或代码后重试（最多 6 轮）；仍失败则改用 javascript 工具或直接推导，不要反复调用同一错误表达式；
-13. 严禁虚构工具调用：解答中写“工具验证”“调用计算器/calculator”等字样时，必须确实调用了该工具并引用真实返回结果；没有真实调用就不要写这些字样，直接给出推导即可；
-14. 涉及根式、对数、指数的大小比较问题（如比较 √2+√3 与 π、比较含 ln/log 或指数的表达式大小等）：看到题目后的第一轮输出就必须调用 calculator 计算各个表达式的数值（保留足够精度），**不要先输出解答文字**；拿到工具返回结果后，再在解答中解说比较过程与结论。不允许先口算再作答，也不允许跳过工具直接比较。`;
+const TEACHER_SYSTEM = `你是一位严谨、简洁的中学教师。目标是在保证正确和易懂的前提下，用最少的必要推理解决学生的问题。
 
-const MAX_TOOL_ROUNDS = 6;
+作答原则：
+1. 按难度自适应：简单题直接给出结论和 1～3 个关键步骤；普通题给出思路、必要推导和答案；只有证明题或确实复杂的题目才展开完整论证。
+2. 得出可靠结论后立即停止。不要反复审题、自我质疑、重复验算、枚举无关可能，也不要同时尝试多种解法；除非用户明确要求，不复述整道题，不重复总结。
+3. 只输出给学生看的解答，不输出内部思考、自我对话、计划或检查过程。解释“为什么”时给出可验证的关键依据，而不是冗长思维过程。
+4. 图片题只提取解题需要的文字、数据和图形关系并直接作答；有多问时逐项回答。看不清或信息不足就明确指出，不猜测、不编造。
+5. 优先心算和直接推导，但下列情况必须先调用 calculator，再引用真实结果作答：pH/pOH 或平衡常数的数值计算；最终数值依赖对数、根式、非整数指数、三角函数或高精度近似；用户明确要求使用 calculator。遇到这些题时，只需确定公式和一个可直接求最终值的表达式，然后立即调用工具；调用前严禁心算、估算、分步计算、预测或写出近似结果。能合并成一个表达式时只调用一次。工具返回后直接使用结果，不得再手算一遍或从头重复推导。
+6. javascript 仅用于必要的大规模枚举、计数、递推或 calculator 无法完成的计算。一次工具调用能完成时不要拆成多轮；工具失败时最多修正重试一次，仍失败就改为直接推导或说明限制。
+7. 严禁虚构工具调用。只有真实调用并拿到结果后，才可以写“工具验证”或引用工具结果；纯符号推导、公式变形和概念解释不调用工具。
+8. 默认使用中文、Markdown 和 LaTeX（行内 $...$，独立行 $$...$$）。避免固定套话和过度分段；结论要明确。英文题保留必要的英文术语并用中文解释。
+9. 若用户明确要求详细推导、证明、所有情况或指定工具，则服从该要求，但仍避免重复内容。`;
+
+const MAX_TOOL_ROUNDS = 3;
+const MAX_CORRECTIONS = 1;
+const INITIAL_THINKING_BUDGET = 1024;
+const FOLLOW_UP_THINKING_BUDGET = 512;
+const CALCULATOR_THINKING_BUDGET = 256;
+const CALCULATOR_FOLLOW_UP_BUDGET = 128;
+const MAX_ANSWER_TOKENS = 4096;
 
 /** 解答文本中出现这些字样，视为声称使用了计算器/工具验证。 */
 const CALC_CLAIM_RE =
   /工具验证|调用(?:了)?(?:calculator|计算器)|(?:calculator|计算器)[^\n。；]{0,10}(?:计算|验证|结果)/i;
+
+/** Text questions whose requested numerical answer must come from calculator. */
+const CALCULATOR_REQUIRED_RE =
+  /(?:请|必须|使用|用).{0,12}(?:calculator|计算器)|(?:pH|pOH).{0,16}(?:值|多少|计算|求)|(?:计算|求|比较).{0,32}(?:log|ln|对数|根式|平方根|开方|非整数指数|三角函数)/i;
+
+function requiresCalculator(question: string): boolean {
+  return CALCULATOR_REQUIRED_RE.test(question);
+}
 
 /** Build the chat messages: system + recent history + current question/image. */
 function buildMessages(input: {
@@ -33,7 +43,7 @@ function buildMessages(input: {
   image?: string;
   history?: ChatMessage[];
 }): ChatMessage[] {
-  const messages: ChatMessage[] = [{ role: "user", content: TEACHER_SYSTEM }];
+  const messages: ChatMessage[] = [];
 
   if (input.history && input.history.length > 0) {
     for (const msg of input.history.slice(-6)) {
@@ -41,9 +51,12 @@ function buildMessages(input: {
     }
   }
 
-  const userText =
+  const baseUserText =
     input.question.trim() ||
-    "请根据图片中的题目作答。注意：图片题与文字题同等对待，若题目涉及数值计算、比较大小、判别式、验根、单位换算等，请调用 calculator 工具验算，并引用工具真实返回的结果；不要在没有调用工具的情况下写“工具验证”等字样。";
+    "请识别图片中的题目并简洁作答。只提取解题所需信息；看不清或信息不足的地方请明确说明。";
+  const userText = requiresCalculator(input.question)
+    ? `${baseUserText}\n\n执行要求：本题属于必须使用 calculator 的数值计算。只确定公式，不做任何心算、估算或分步数值计算；第一轮立即用一个完整表达式调用 calculator。工具返回后直接引用结果给出简洁解答，不要重新计算或重复推导。`
+    : baseUserText;
   messages.push(
     input.image
       ? { role: "user", content: userText, image: input.image }
@@ -83,20 +96,33 @@ export async function* streamAnswer(
     requestId?: string;
   }
 ): AsyncGenerator<StreamDelta, void, unknown> {
-  const messages = toOpenAIMessages(buildMessages(input));
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    { role: "system", content: TEACHER_SYSTEM },
+    ...toOpenAIMessages(buildMessages(input)),
+  ];
   const client = createClient(env);
   const model = input.model ?? MODELS.VISION;
   const requestId = input.requestId ?? "local";
+  const calculatorRequired = requiresCalculator(input.question);
   let emptyRounds = 0;
   let toolCallCount = 0;
   let corrections = 0;
   console.log(`[request] ${requestId} model=${model} question=${input.question.slice(0, 120)}`);
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const params: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
+    const params: OpenAI.Chat.ChatCompletionCreateParamsStreaming & {
+      thinking_budget: number;
+    } = {
       model,
-      temperature: 0.3,
-      max_tokens: 8192,
+      temperature: 0.2,
+      max_tokens: MAX_ANSWER_TOKENS,
+      thinking_budget: calculatorRequired
+        ? round === 0
+          ? CALCULATOR_THINKING_BUDGET
+          : CALCULATOR_FOLLOW_UP_BUDGET
+        : round === 0
+          ? INITIAL_THINKING_BUDGET
+          : FOLLOW_UP_THINKING_BUDGET,
       stream: true,
       messages,
       tools: TOOL_DEFINITIONS as unknown as OpenAI.Chat.ChatCompletionTool[],
@@ -112,7 +138,11 @@ export async function* streamAnswer(
       if (roundResult.content.trim() !== "") {
         // 防虚构：解答声称调用了计算器，但整个请求没有任何真实 tool_call 时，
         // 追加一轮纠正，要求模型真实调用 calculator 后重新作答。
-        if (toolCallCount === 0 && corrections < 2 && CALC_CLAIM_RE.test(roundResult.content)) {
+        if (
+          toolCallCount === 0 &&
+          corrections < MAX_CORRECTIONS &&
+          CALC_CLAIM_RE.test(roundResult.content)
+        ) {
           corrections += 1;
           console.warn(
             `[correction] ${requestId} 解答声称调用计算器但无真实 tool_call，要求实际调用`
@@ -180,6 +210,14 @@ export async function* streamAnswer(
         tool_call_id: call.id,
         content: result.ok ? result.output : `工具执行失败：${result.output}`,
       } as OpenAI.Chat.ChatCompletionMessageParam);
+    }
+
+    if (calculatorRequired) {
+      messages.push({
+        role: "user",
+        content:
+          "工具结果已经返回。请直接引用该结果完成最终解答；不要重新心算、估算、验算或从头重复推导。",
+      });
     }
   }
 

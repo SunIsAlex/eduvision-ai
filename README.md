@@ -30,7 +30,7 @@ Cloudflare Worker (Hono + TypeScript)
 - 一个多模态模型读图 + 作答 + 老师式分步讲解（Markdown + LaTeX 公式渲染）
 - SSE 流式输出：`thinking`（开始提示）→ `reasoning`（思维链逐字实时显示）→ `answer`（解题内容逐字输出）→ `done`；模型调用工具时中间插入 `tool_call` / `tool_result` 事件
 - 工具支持：`calculator`（精确数学计算，mathjs 加固沙箱）与 `javascript`（Web Worker 沙箱枚举/计数），工具调用与结果在聊天中可视化展示
-- 长答案不截断（8192 token 上限）
+- 按题目难度自适应讲解，限制无效思考（普通题首轮/后续 1024/512 token，强制计算器题 256/128 token；回答上限 4096 token）
 - 移动端响应式聊天界面，API Key 只在 Worker Secret 中
 
 ## 目录结构

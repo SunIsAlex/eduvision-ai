@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bot, Brain, Calculator, Check, Code, Loader2, TriangleAlert, User } from "lucide-react";
 import { Markdown } from "./Markdown";
 import type { ChatMessage as Message, ThinkingStep } from "../lib/types";
@@ -22,6 +22,62 @@ function prettyArgs(raw: string): string {
   } catch {
     return raw;
   }
+}
+
+function getCalculatorExpression(raw: string): string | null {
+  try {
+    const parsed = JSON.parse(raw) as { expression?: unknown };
+    return typeof parsed.expression === "string" && parsed.expression.trim()
+      ? parsed.expression.trim()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function CalculatorExpression({ raw }: { raw: string }) {
+  const expression = getCalculatorExpression(raw);
+  const [tex, setTex] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setTex(null);
+    if (!expression) return () => undefined;
+
+    void import("../lib/calc")
+      .then(({ expressionToTex }) => {
+        if (active) setTex(expressionToTex(expression));
+      })
+      .catch(() => {
+        if (active) setTex(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [expression]);
+
+  if (!expression) {
+    return (
+      <code className="block overflow-x-auto whitespace-pre-wrap break-all font-mono text-xs text-slate-400">
+        {prettyArgs(raw)}
+      </code>
+    );
+  }
+
+  return (
+    <div
+      className="tool-expression mt-2 overflow-x-auto rounded-md border border-slate-800 bg-slate-950/70 px-3 py-2 text-center"
+      title={expression}
+      aria-label={`计算表达式：${expression}`}
+    >
+      {tex ? (
+        <Markdown content={`$${tex}$`} />
+      ) : (
+        <code className="font-mono text-sm text-amber-200">{expression}</code>
+      )}
+    </div>
+  );
 }
 
 export function ChatMessage({ message, thinking }: Props) {
@@ -130,12 +186,15 @@ export function ChatMessage({ message, thinking }: Props) {
                       <Code className="h-3.5 w-3.5 shrink-0 text-sky-400" />
                     )}
                     <span className="font-medium">{isCalc ? "计算器" : "JavaScript 沙箱"}</span>
-                    <span
-                      className="min-w-0 flex-1 truncate font-mono text-[11px] text-slate-500"
-                      title={prettyArgs(t.args)}
-                    >
-                      {prettyArgs(t.args)}
-                    </span>
+                    {!isCalc && (
+                      <span
+                        className="min-w-0 flex-1 truncate font-mono text-[11px] text-slate-500"
+                        title={prettyArgs(t.args)}
+                      >
+                        {prettyArgs(t.args)}
+                      </span>
+                    )}
+                    {isCalc && <span className="flex-1" />}
                     {running ? (
                       <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-emerald-400" />
                     ) : t.status === "done" ? (
@@ -144,6 +203,7 @@ export function ChatMessage({ message, thinking }: Props) {
                       <TriangleAlert className="h-3.5 w-3.5 shrink-0 text-red-400" />
                     )}
                   </div>
+                  {isCalc && <CalculatorExpression raw={t.args} />}
                   {t.output && (
                     <pre className="mt-1.5 max-h-32 overflow-auto whitespace-pre-wrap rounded bg-slate-950/60 px-2 py-1.5 font-mono text-[11px] leading-4 text-emerald-300">
                       {t.output}

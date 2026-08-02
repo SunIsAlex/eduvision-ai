@@ -82,6 +82,14 @@ const MAX_FACTORIAL_ARG = 2000;
 const MAX_COMB_ARG = 20_000;
 const MAX_POW_EXPONENT = 1000;
 
+/** Convert a calculator expression to KaTeX-compatible LaTeX for the UI. */
+export function expressionToTex(rawExpr: string): string {
+  const expr = rawExpr.trim().replace(/\*\*/g, "^");
+  if (!expr) throw new Error("表达式为空");
+  if (expr.length > MAX_EXPR_LEN) throw new Error("表达式过长");
+  return limitedParse(expr).toTex();
+}
+
 export function calc(rawExpr: string): string {
   // JS-style power operator compatibility: 2**3 -> 2^3
   const expr = rawExpr.trim().replace(/\*\*/g, "^");

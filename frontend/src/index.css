@@ -72,3 +72,10 @@ body {
 .markdown-body .katex-display {
   @apply my-3 overflow-x-auto overflow-y-hidden py-1;
 }
+
+.tool-expression .markdown-body {
+  @apply text-base leading-none text-amber-100;
+}
+.tool-expression .markdown-body p {
+  @apply m-0;
+}
