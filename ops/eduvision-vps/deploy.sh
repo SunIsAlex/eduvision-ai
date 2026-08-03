@@ -3,6 +3,8 @@ set -eu
 
 repo=/opt/eduvision-ai
 branch=${EDUVISION_BRANCH:-tencent-edge-functions}
+export HOME=/var/cache/eduvision-deploy
+export npm_config_cache=/var/cache/eduvision-deploy/npm
 
 cd "$repo"
 git fetch --prune origin
