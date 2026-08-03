@@ -1,16 +1,13 @@
 /**
  * Model-callable tools.
  *
- * All tools are executed in the USER'S BROWSER (zero server cost, risk on the
- * user):
+ * Tools execute in the safest low-latency location for their workload:
  *
- *  - calculator:  hardened mathjs (no eval/import, bounded work), loaded
- *                 lazily in the frontend so the initial bundle stays small.
+ *  - calculator:  hardened mathjs in the VPS Node process.
  *  - javascript:  enumeration/counting code in a Web Worker sandbox (no DOM).
  *
- * The backend only relays tool calls to the browser, waits for the result via
- * /api/tool/result, feeds it back to the model and keeps streaming on the same
- * SSE connection.
+ * Browser tool calls are relayed through /api/tool/result; server calculator
+ * calls return directly without a browser round trip.
  */
 
 export interface ToolResult {
@@ -18,7 +15,7 @@ export interface ToolResult {
   output: string;
 }
 
-export type ToolExecutor = "browser";
+export type ToolExecutor = "server" | "browser";
 
 export const TOOL_DEFINITIONS = [
   {
@@ -26,7 +23,7 @@ export const TOOL_DEFINITIONS = [
     function: {
       name: "calculator",
       description:
-        "精确计算数学表达式（用户浏览器本地加固版 mathjs，BigNumber 高精度，0.1+0.2=0.3）。expression 只写表达式本身，不要解释、不要写等号。\n" +
+        "精确计算数学表达式（服务端加固版 mathjs，BigNumber 高精度，0.1+0.2=0.3）。expression 只写表达式本身，不要解释、不要写等号。\n" +
           "运算符：+ - * / %(取余) ^ 或 **(幂) !(阶乘) 括号；数组/矩阵用方括号：[1,2,3]、[[1,2],[3,4]]；矩阵乘法用 *，逐元素乘用 .*。注意：不支持 //（整数除法请写 floor(a/b)）。\n" +
           "可用 mathjs 函数（名字：作用）：\n" +
           "- 基本与取整：abs 绝对值；floor/ceil 向下/向上取整；round 四舍五入；fix 向零取整；sign 符号；min/max 最小/最大；pow(x,n) 幂；sqrt 平方根；cbrt 立方根；nthRoot(x,n) n 次方根；square/cube 平方/立方；hypot 到原点的距离\n" +
@@ -67,8 +64,8 @@ export const TOOL_DEFINITIONS = [
   },
 ] as const;
 
-/** Every current tool runs in the browser; the backend never executes code. */
+/** Calculator is safe and fast server-side; arbitrary JavaScript stays in the browser sandbox. */
 export const TOOL_EXECUTORS: Record<string, ToolExecutor> = {
-  calculator: "browser",
+  calculator: "server",
   javascript: "browser",
 };

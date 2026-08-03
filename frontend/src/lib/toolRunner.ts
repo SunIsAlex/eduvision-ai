@@ -1,7 +1,6 @@
 /**
- * Browser-side tool execution. Both current tools run locally in the user's
- * browser — calculator uses a lazily-loaded hardened mathjs, javascript runs
- * in a Web Worker (no DOM/page access). The result is POSTed back to the
+ * Browser-side execution for arbitrary JavaScript. Calculator runs in the VPS
+ * Node process; JavaScript remains in a Web Worker (no DOM/page access) and is POSTed back to the
  * backend, which feeds it to the model and keeps streaming. 风险自负.
  */
 import type { ToolResult } from "./types";
@@ -18,15 +17,6 @@ export async function runTool(tool: { name: string; args: string }): Promise<Too
   }
 
   switch (tool.name) {
-    case "calculator": {
-      // mathjs is split into its own chunk and only loaded when first needed.
-      const { calc } = await import("./calc");
-      try {
-        return { ok: true, output: calc(String(args.expression ?? "")) };
-      } catch (err) {
-        return { ok: false, output: `工具执行失败：${(err as Error).message}` };
-      }
-    }
     case "javascript":
       return runJavaScript(String(args.code ?? ""));
     default:

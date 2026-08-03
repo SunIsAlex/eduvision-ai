@@ -9,7 +9,8 @@
     "build": "tsc --noEmit"
   },
   "dependencies": {
-    "hono": "^4.6.20"
+    "hono": "^4.6.20",
+    "mathjs": "^15.2.0"
   },
   "devDependencies": {
     "@hono/node-server": "^1.14.0",

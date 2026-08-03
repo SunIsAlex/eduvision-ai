@@ -11,6 +11,7 @@ import {
 } from "./anthropic";
 import { TOOL_EXECUTORS, TOOL_DEFINITIONS } from "./tools";
 import { awaitBrowserToolResult } from "./toolbridge";
+import { executeServerTool } from "./server-tools";
 import { MODELS, type ChatMessage, type Env } from "./types";
 
 const TEACHER_SYSTEM = `你是一位严谨、简洁的中学教师。目标是在保证正确和易懂的前提下，用最少的必要推理解决学生的问题。
@@ -284,10 +285,19 @@ export async function* streamAnswer(
       content: roundResult.assistantContent,
     });
 
-    let toolExecutionFailed = false;
-    const toolResultBlocks: Array<Record<string, unknown> & { type: string }> = [];
-    for (const call of roundResult.toolCalls) {
+    // Register every browser wait before emitting any call, and start server
+    // tools immediately. This lets all calls from one Claude turn run in
+    // parallel instead of serializing browser round trips.
+    const executions = roundResult.toolCalls.map((call) => {
       const executor = TOOL_EXECUTORS[call.name] ?? "browser";
+      const resultPromise =
+        executor === "server"
+          ? executeServerTool(call.name, call.args)
+          : awaitBrowserToolResult(requestId, call.id);
+      return { call, executor, resultPromise };
+    });
+
+    for (const { call, executor } of executions) {
       console.log(`[tool_call] ${requestId} ${call.name} ${call.args.slice(0, 200)}`);
       yield {
         kind: "tool_call",
@@ -297,8 +307,18 @@ export async function* streamAnswer(
         args: call.args,
         executor,
       };
+    }
 
-      const result = await awaitBrowserToolResult(requestId, call.id);
+    const completed = await Promise.all(
+      executions.map(async (execution) => ({
+        ...execution,
+        result: await execution.resultPromise,
+      }))
+    );
+
+    let toolExecutionFailed = false;
+    const toolResultBlocks: Array<Record<string, unknown> & { type: string }> = [];
+    for (const { call, result } of completed) {
       if (!result.ok) toolExecutionFailed = true;
       console.log(`[tool_result] ${requestId} ${call.name} ok=${result.ok} output=${result.output.slice(0, 120)}`);
 

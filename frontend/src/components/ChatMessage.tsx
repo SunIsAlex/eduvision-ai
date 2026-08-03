@@ -262,9 +262,11 @@ export function ChatMessage({ message, thinking, showDebug = false }: Props) {
                 </div>
               );
             })}
-            <p className="text-[10px] text-slate-600">
-              代码在你的浏览器本地沙箱中执行 · 风险自负
-            </p>
+            {message.tools.some((tool) => tool.name === "javascript") && (
+              <p className="text-[10px] text-slate-600">
+                JavaScript 在你的浏览器本地沙箱中执行 · 风险自负
+              </p>
+            )}
           </div>
         )}
 

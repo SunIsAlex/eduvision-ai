@@ -8,7 +8,7 @@
 浏览器（React）
   ├─ 上传/压缩图片
   ├─ 渲染 Markdown + LaTeX
-  └─ 本地执行 calculator / JavaScript 工具
+  └─ 本地执行 JavaScript 工具
           │ SSE + 工具结果回传
           ▼
 VPS Node.js（Hono）
@@ -27,7 +27,7 @@ MyTokk Anthropic-compatible API → claude-sonnet-4-6
 - Claude 原生多模态读图与连续对话，保留历史文字和图片。
 - 可选 adaptive thinking 摘要。
 - SSE 流式答案、工具调用卡片和原始响应调试面板。
-- 浏览器本地 calculator 与 Web Worker JavaScript 沙箱。
+- VPS 加固版 calculator 与浏览器 Web Worker JavaScript 沙箱。
 - 每个会话生成不可猜测的 URL，可跨设备恢复并分享调试。
 - Markdown、GFM、KaTeX 渲染，兼容多工具回合间相邻公式块。
 

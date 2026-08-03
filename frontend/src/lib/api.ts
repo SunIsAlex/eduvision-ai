@@ -142,29 +142,12 @@ async function handleFrame(
         const args = parsed.args ?? "{}";
         const executor = parsed.executor === "server" ? "server" : "browser";
         cb.onToolCall({ toolCallId, name, args, executor });
-        // Every tool currently runs in the browser: execute locally, then POST
-        // the result back so the paused SSE stream can continue.
-        const result = await runTool({ name, args });
-        cb.onToolResult({ toolCallId, name, ok: result.ok, output: result.output });
-        try {
-          const res = await fetch("/api/tool/result", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              requestId: ctx.requestId,
-              toolCallId,
-              ok: result.ok,
-              output: result.output,
-            }),
-            signal: ctx.signal,
-          });
-          if (!res.ok) {
-            console.warn("[tool] result delivery failed:", res.status);
-          }
-        } catch (err) {
-          // The backend wait will time out and continue with an error result.
-          console.warn("[tool] result delivery error:", (err as Error).message);
-        }
+        // Server tools report their result on this same SSE stream. Only
+        // browser tools need local execution and a result POST.
+        if (executor === "server") break;
+        // Do not await here: one SSE frame may contain several independent
+        // browser tools, which should start together rather than serialize.
+        void executeAndDeliverBrowserTool({ toolCallId, name, args }, cb, ctx);
         break;
       }
       case "tool_result": {
@@ -187,6 +170,37 @@ async function handleFrame(
     // ignore malformed frames
   }
   return event;
+}
+
+async function executeAndDeliverBrowserTool(
+  tool: { toolCallId: string; name: string; args: string },
+  cb: StreamCallbacks,
+  ctx: { requestId: string; signal?: AbortSignal }
+): Promise<void> {
+  const result = await runTool({ name: tool.name, args: tool.args });
+  cb.onToolResult({
+    toolCallId: tool.toolCallId,
+    name: tool.name,
+    ok: result.ok,
+    output: result.output,
+  });
+  try {
+    const response = await fetch("/api/tool/result", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        requestId: ctx.requestId,
+        toolCallId: tool.toolCallId,
+        ok: result.ok,
+        output: result.output,
+      }),
+      signal: ctx.signal,
+    });
+    if (!response.ok) console.warn("[tool] result delivery failed:", response.status);
+  } catch (error) {
+    // The backend wait will time out and continue with an error result.
+    console.warn("[tool] result delivery error:", (error as Error).message);
+  }
 }
 
 /** Upload an image and receive its compressed data URL. */

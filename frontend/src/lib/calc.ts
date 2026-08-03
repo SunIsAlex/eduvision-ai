@@ -1,6 +1,6 @@
 /**
- * Hardened mathjs calculator, executed in the user's browser (zero server
- * cost; the user accepts the risk). Follows the official hardening guidance:
+ * Shared hardened mathjs calculator. Numerical evaluation runs in the VPS;
+ * the frontend reuses its parser to render expressions as LaTeX. It follows the hardening guidance:
  * the few functions that can parse/alter arbitrary input are disabled, and
  * stability guards bound expression size and heavy calls.
  */
