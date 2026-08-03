@@ -1,4 +1,5 @@
 import type { ChatMessage } from "./types";
+import { repairAdjacentDisplayMath } from "./utils";
 
 const LEGACY_STORAGE_KEY = "eduvision-chat-messages-v1";
 const MAX_MESSAGES = 50;
@@ -15,7 +16,7 @@ function normalize(m: unknown): ChatMessage | null {
   return {
     id: typeof msg.id === "string" ? msg.id : String(Math.random()).slice(2),
     role,
-    content: typeof msg.content === "string" ? msg.content : "",
+    content: typeof msg.content === "string" ? repairAdjacentDisplayMath(msg.content) : "",
     ...(typeof msg.reasoning === "string" ? { reasoning: msg.reasoning } : {}),
     ...(typeof msg.ocr === "string" ? { ocr: msg.ocr } : {}),
     ...(Array.isArray(msg.tools) ? { tools: msg.tools } : {}),

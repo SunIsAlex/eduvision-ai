@@ -3,6 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
+import { repairAdjacentDisplayMath } from "../lib/utils";
 
 /**
  * Streaming text is often mid-syntax (unclosed $$ or code fences). If a
@@ -31,6 +32,7 @@ class MarkdownErrorBoundary extends Component<
 
 /** Markdown + GFM tables + LaTeX rendering. */
 export function Markdown({ content }: { content: string }) {
+  const repairedContent = repairAdjacentDisplayMath(content);
   return (
     <div className="markdown-body">
       <MarkdownErrorBoundary>
@@ -45,7 +47,7 @@ export function Markdown({ content }: { content: string }) {
             ),
           }}
         >
-          {content}
+          {repairedContent}
         </ReactMarkdown>
       </MarkdownErrorBoundary>
     </div>

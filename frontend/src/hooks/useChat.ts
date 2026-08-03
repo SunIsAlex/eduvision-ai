@@ -8,7 +8,7 @@ import {
   replaceSessionUrl,
   saveRemoteSession,
 } from "../lib/session";
-import { uid } from "../lib/utils";
+import { appendMarkdownDelta, uid } from "../lib/utils";
 import type { ChatMessage, ThinkingStep } from "../lib/types";
 
 export function useChat() {
@@ -162,7 +162,7 @@ export function useChat() {
           },
           onAnswer: (delta) => {
             setThinking([]);
-            patch((m) => ({ ...m, content: m.content + delta }));
+            patch((m) => ({ ...m, content: appendMarkdownDelta(m.content, delta) }));
           },
           onToolCall: (tool) => {
             setThinking([]);
