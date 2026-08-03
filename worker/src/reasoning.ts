@@ -278,6 +278,7 @@ export async function* streamAnswer(
     });
 
     let toolExecutionFailed = false;
+    const toolResultBlocks: Array<Record<string, unknown> & { type: string }> = [];
     for (const call of roundResult.toolCalls) {
       const executor = TOOL_EXECUTORS[call.name] ?? "browser";
       console.log(`[tool_call] ${requestId} ${call.name} ${call.args.slice(0, 200)}`);
@@ -303,26 +304,28 @@ export async function* streamAnswer(
         output: result.output,
       };
 
-      messages.push({
-        role: "user",
-        content: [{
-          type: "tool_result",
-          tool_use_id: call.id,
-          content: result.ok ? result.output : `工具执行失败：${result.output}`,
-          is_error: !result.ok,
-        }],
+      toolResultBlocks.push({
+        type: "tool_result",
+        tool_use_id: call.id,
+        content: result.ok ? result.output : `工具执行失败：${result.output}`,
+        is_error: !result.ok,
       });
     }
 
     if ((javascriptRequired || calculatorRequired) && toolExecutionFailed) {
-        messages.push({
-          role: "user",
-          content: javascriptRequired
-            ? "javascript 执行失败。只根据工具返回的真实错误修正代码并重新调用一次 javascript；不要心算、估算、改为手工求解或输出最终答案。代码必须是可直接执行的完整脚本：禁止顶层 return，禁止用同一名称同时表示函数和数值，禁止对标量做数组解构，最终用 console.log 输出 root、residual 和单位换算结果。"
-            : "calculator 执行失败。只根据工具返回的真实错误修正表达式并重新调用一次 calculator；不要心算、估算或输出最终答案。",
-        });
-        continue;
+      toolResultBlocks.push({
+        type: "text",
+        text: javascriptRequired
+          ? "javascript 执行失败。只根据工具返回的真实错误修正代码并重新调用一次 javascript；不要心算、估算、改为手工求解或输出最终答案。代码必须是可直接执行的完整脚本：禁止顶层 return，禁止用同一名称同时表示函数和数值，禁止对标量做数组解构，最终用 console.log 输出 root、residual 和单位换算结果。"
+          : "calculator 执行失败。只根据工具返回的真实错误修正表达式并重新调用一次 calculator；不要心算、估算或输出最终答案。",
+      });
     }
+
+    // All tool_result blocks for one assistant turn must be in the single,
+    // immediately following user message. This matters when Claude emits
+    // multiple parallel tool_use blocks in one response.
+    messages.push({ role: "user", content: toolResultBlocks });
+    if ((javascriptRequired || calculatorRequired) && toolExecutionFailed) continue;
   }
 
   throw new Error("工具调用轮次过多，已停止。");
