@@ -76,6 +76,14 @@ export function requiresJavaScript(question: string): boolean {
   return JAVASCRIPT_REQUIRED_RE.test(question);
 }
 
+/** Explicit graph requests must produce a real visual tool call. */
+const FUNCTION_PLOT_REQUIRED_RE =
+  /(?:画出|画一下|绘制|作出|显示).{0,16}(?:函数)?图(?:像)?|(?:Desmos|function_plot)/i;
+
+function requiresFunctionPlot(question: string): boolean {
+  return FUNCTION_PLOT_REQUIRED_RE.test(question);
+}
+
 /** Build the complete active conversation plus the current question/image. */
 function buildMessages(input: {
   question: string;
@@ -214,20 +222,24 @@ export async function* streamAnswer(
   );
   const javascriptRequired = requiresJavaScript(input.question);
   const calculatorRequired = !javascriptRequired && requiresCalculator(input.question);
+  const functionPlotRequired = requiresFunctionPlot(input.question);
   let emptyRounds = 0;
   let toolCallCount = 0;
+  const usedTools = new Set<string>();
   let corrections = 0;
   console.log(
-    `[request] ${requestId} model=${model} thinking=${input.thinking === true} requiredTool=${javascriptRequired ? "javascript" : calculatorRequired ? "calculator" : "none"} image=${Boolean(input.image)} history=${input.history?.length ?? 0} historyImages=${input.history?.filter((message) => Boolean(message.image)).length ?? 0} question=${input.question.slice(0, 120)}`
+    `[request] ${requestId} model=${model} thinking=${input.thinking === true} requiredTools=${[javascriptRequired && "javascript", calculatorRequired && "calculator", functionPlotRequired && "function_plot"].filter(Boolean).join(",") || "none"} image=${Boolean(input.image)} history=${input.history?.length ?? 0} historyImages=${input.history?.filter((message) => Boolean(message.image)).length ?? 0} question=${input.question.slice(0, 120)}`
   );
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const requiredTool = javascriptRequired
+    const requiredTool = javascriptRequired && !usedTools.has("javascript")
       ? "javascript"
-      : calculatorRequired
+      : calculatorRequired && !usedTools.has("calculator")
         ? "calculator"
-        : null;
-    const mustCallTool = requiredTool !== null && toolCallCount === 0;
+        : functionPlotRequired && !usedTools.has("function_plot")
+          ? "function_plot"
+          : null;
+    const mustCallTool = requiredTool !== null;
     const selectedTools = mustCallTool
       ? TOOL_DEFINITIONS.filter((tool) => tool.function.name === requiredTool)
       : TOOL_DEFINITIONS;
@@ -330,6 +342,7 @@ export async function* streamAnswer(
     }
     emptyRounds = 0;
     toolCallCount += roundResult.toolCalls.length;
+    for (const call of roundResult.toolCalls) usedTools.add(call.name);
 
     // Anthropic requires the exact assistant content blocks before tool_result.
     messages.push({
