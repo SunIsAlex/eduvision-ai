@@ -109,20 +109,20 @@ export function ChatMessage({ message, thinking, showDebug = false }: Props) {
   if (isUser) {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] sm:max-w-[75%]">
+        <div className="max-w-[88%] sm:max-w-[78%]">
           <div className="flex items-start justify-end gap-2">
-            <div className="rounded-2xl rounded-br-md bg-brand-600 px-4 py-3 text-slate-50 shadow">
+            <div className="rounded-3xl bg-[#2f2f2f] px-5 py-3.5 text-[#ececec] shadow-sm shadow-black/10">
               {message.content && <p className="whitespace-pre-wrap break-words">{message.content}</p>}
               {message.image && (
                 <img
                   src={message.image}
                   alt="题目"
-                  className="mt-2 max-h-64 rounded-lg border border-white/20 object-contain"
+                  className="mt-3 max-h-64 rounded-xl border border-[#555] object-contain"
                 />
               )}
             </div>
-            <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-500">
-              <User className="h-4 w-4 text-white" />
+            <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#3f3f3f]">
+              <User className="h-4 w-4 text-[#d1d1d1]" />
             </div>
           </div>
         </div>
@@ -131,21 +131,21 @@ export function ChatMessage({ message, thinking, showDebug = false }: Props) {
   }
 
   return (
-    <div className="flex items-start gap-2">
-      <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-800">
-        <Bot className="h-4 w-4 text-emerald-400" />
+    <div className="flex items-start gap-3">
+      <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-500">
+        <Bot className="h-4 w-4 text-white" />
       </div>
-      <div className="min-w-0 max-w-[92%] flex-1 sm:max-w-[85%]">
+      <div className="min-w-0 max-w-[94%] flex-1 sm:max-w-[90%]">
         {/* Pipeline badge */}
         {message.pipeline && !message.error && (
-          <span className="mb-1 inline-block rounded-md bg-slate-800 px-2 py-0.5 text-xs text-slate-400">
+          <span className="mb-2 inline-block rounded-lg bg-[#2f2f2f] px-2.5 py-1 text-xs leading-5 text-[#a0a0a0]">
             {PIPELINE_LABELS[message.pipeline] ?? message.pipeline}
             {message.model ? ` · ${message.model.split("/").pop()}` : ""}
           </span>
         )}
 
         {thinking && thinking.length > 0 && (
-          <div className="mb-2 rounded-lg border border-emerald-500/20 bg-slate-900/70 px-3 py-2">
+          <div className="mb-3 rounded-xl border border-brand-500/20 bg-[#282828] px-4 py-3">
             <p className="flex items-center gap-2 text-[13px] text-slate-300">
               <Brain className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
               <span className="font-medium">Claude 正在思考</span>
@@ -195,7 +195,7 @@ export function ChatMessage({ message, thinking, showDebug = false }: Props) {
         {message.reasoning && (
           <details
             open={message.status === "streaming"}
-            className="mb-2 overflow-hidden rounded-lg border border-slate-800 bg-slate-900/70"
+            className="mb-3 overflow-hidden rounded-xl border border-[#3d3d3d] bg-[#282828]"
           >
             <summary className="flex cursor-pointer select-none items-center gap-2 px-3 py-2 text-xs text-slate-400 transition hover:text-slate-200">
               <Brain className="h-3.5 w-3.5" />
@@ -209,7 +209,7 @@ export function ChatMessage({ message, thinking, showDebug = false }: Props) {
             </summary>
             <div
               ref={reasoningRef}
-              className="scrollbar-thin max-h-56 overflow-y-auto whitespace-pre-wrap border-t border-slate-800 px-3 py-2 text-sm leading-6 text-slate-400"
+              className="scrollbar-thin max-h-56 overflow-y-auto whitespace-pre-wrap border-t border-[#3d3d3d] px-4 py-3 text-sm leading-6 text-[#b4b4b4]"
             >
               {message.reasoning}
               {message.status === "streaming" && (
@@ -221,7 +221,7 @@ export function ChatMessage({ message, thinking, showDebug = false }: Props) {
 
         {/* Tool calls made while producing this answer. */}
         {message.tools && message.tools.length > 0 && (
-          <div className="mb-2 space-y-1.5">
+          <div className="mb-3 space-y-2">
             {message.tools.map((t) => {
               const running = t.status === "running";
               const isCalc = t.name === "calculator";
@@ -229,7 +229,7 @@ export function ChatMessage({ message, thinking, showDebug = false }: Props) {
               return (
                 <div
                   key={t.toolCallId}
-                  className="rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2"
+                  className="rounded-xl border border-[#3d3d3d] bg-[#282828] px-4 py-3"
                 >
                   <div className="flex items-center gap-2 text-xs text-slate-300">
                     {isCalc ? (
@@ -301,8 +301,8 @@ export function ChatMessage({ message, thinking, showDebug = false }: Props) {
 
         <div
           className={cn(
-            "rounded-2xl rounded-tl-md bg-slate-800/80 px-4 py-3 shadow",
-            message.error && "border border-red-500/40"
+            "px-1 py-1",
+            message.error && "rounded-xl border border-red-500/40 bg-red-950/20 px-4 py-3"
           )}
         >
           {message.error ? (

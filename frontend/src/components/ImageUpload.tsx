@@ -35,13 +35,13 @@ export function ImageUpload({ value, onChange, disabled }: Props) {
         <img
           src={value}
           alt="已选择题目"
-          className="h-20 w-20 rounded-lg border border-slate-600 object-cover"
+          className="h-20 w-20 rounded-xl border border-[#555] object-cover"
         />
         <button
           type="button"
           onClick={() => onChange(null)}
           disabled={disabled}
-          className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-slate-700 text-slate-200 hover:bg-red-500 disabled:opacity-50"
+          className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-[#4a4a4a] text-[#ececec] hover:bg-red-500 disabled:opacity-50"
           aria-label="移除图片"
         >
           <X className="h-3.5 w-3.5" />
@@ -82,7 +82,7 @@ export function ImageUpload({ value, onChange, disabled }: Props) {
           void handleFile(e.dataTransfer.files?.[0]);
         }}
         className={cn(
-          "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-600 text-slate-400 transition hover:border-brand-500 hover:text-brand-400",
+          "flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#555] text-[#b4b4b4] transition hover:border-brand-500 hover:bg-[#3a3a3a] hover:text-brand-300",
           dragging && "border-brand-500 bg-brand-500/10 text-brand-400",
           disabled && "cursor-not-allowed opacity-50",
           busy && "pointer-events-none"

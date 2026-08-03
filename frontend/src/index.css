@@ -12,7 +12,9 @@ body,
 }
 
 body {
-  @apply bg-slate-950 text-slate-100 antialiased;
+  @apply antialiased;
+  background: #212121;
+  color: #ececec;
   overscroll-behavior: none;
 }
 
@@ -21,14 +23,16 @@ body {
   width: 6px;
 }
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  @apply rounded-full bg-slate-700;
+  @apply rounded-full;
+  background: #4a4a4a;
 }
 .scrollbar-thin::-webkit-scrollbar-track {
   background: transparent;
 }
 
 .markdown-body {
-  @apply text-[15px] leading-7 text-slate-100;
+  @apply text-[15px] leading-7;
+  color: #ececec;
 }
 .markdown-body p {
   @apply my-2;
