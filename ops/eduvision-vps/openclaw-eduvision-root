@@ -8,6 +8,7 @@ case "${1:-}" in
       --property=PrivateTmp=yes \
       --property=ProtectHome=yes \
       --property=ProtectSystem=full \
+      --property=ReadWritePaths="/etc/systemd/system /var/lib/eduvision-ai" \
       --property=Environment=HOME=/var/cache/eduvision-deploy \
       --property=Environment=npm_config_cache=/var/cache/eduvision-deploy/npm \
       /opt/eduvision-ai/ops/eduvision-vps/deploy.sh
