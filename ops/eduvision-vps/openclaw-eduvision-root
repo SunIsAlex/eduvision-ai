@@ -1,0 +1,25 @@
+#!/bin/sh
+set -eu
+
+case "${1:-}" in
+  deploy)
+    exec systemd-run --quiet --wait --pipe --collect \
+      --unit=openclaw-eduvision-deploy \
+      --property=PrivateTmp=yes \
+      --property=ProtectHome=yes \
+      --property=ProtectSystem=full \
+      /opt/eduvision-ai/ops/eduvision-vps/deploy.sh
+    ;;
+  status)
+    revision=$(git -C /opt/eduvision-ai rev-parse --short HEAD 2>/dev/null || true)
+    service=$(systemctl is-active eduvision-ai.service 2>/dev/null || true)
+    health=$(curl --silent --output /dev/null --write-out '%{http_code}' \
+      http://127.0.0.1:8791/health || true)
+    printf 'service=eduvision\nrevision=%s\nunit=%s\nhealth_http=%s\n' \
+      "$revision" "$service" "$health"
+    ;;
+  *)
+    echo "Usage: openclaw-eduvision-root deploy|status" >&2
+    exit 64
+    ;;
+esac
