@@ -5,7 +5,7 @@ import { runPipeline } from "./stream";
 import { deliverBrowserToolResult } from "./toolbridge";
 import { resolveModel, type ChatRequest, type Env } from "./types";
 
-const app = new Hono<{ Bindings: Env }>();
+export const app = new Hono<{ Bindings: Env }>();
 
 // EdgeOne Node Functions accept at most 6 MB request/response bodies. Keep
 // room for base64 expansion, JSON framing, question text and recent history.

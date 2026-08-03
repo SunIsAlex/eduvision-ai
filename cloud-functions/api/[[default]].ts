@@ -1,4 +1,4 @@
-import app from "../../worker/src/index";
+import { app } from "../../worker/src/index";
 import type { Env } from "../../worker/src/types";
 
 interface NodeFunctionContext {
