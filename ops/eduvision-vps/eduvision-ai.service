@@ -1,0 +1,25 @@
+[Unit]
+Description=EduVision AI Node service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=eduvision
+Group=eduvision
+WorkingDirectory=/opt/eduvision-ai
+Environment=NODE_ENV=production
+Environment=PORT=8791
+EnvironmentFile=/etc/eduvision-ai.env
+ExecStart=/usr/bin/npm run dev:node --workspace worker
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/eduvision-ai
+
+[Install]
+WantedBy=multi-user.target
