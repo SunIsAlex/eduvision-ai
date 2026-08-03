@@ -75,7 +75,7 @@ export function Composer(props: Props) {
           {loading ? <Square className="h-4 w-4 fill-current" /> : <Send className="h-4 w-4" />}
         </button>
       </div>
-      <div className="mx-auto mt-3 flex max-w-4xl flex-wrap items-center justify-between gap-3 px-1">
+      <div className="mx-auto mt-3 flex max-w-4xl items-center px-1">
         <button
           type="button"
           role="switch"
@@ -93,9 +93,6 @@ export function Composer(props: Props) {
           <Brain className="h-3.5 w-3.5" />
           深度思考 {props.thinkingEnabled ? "开" : "关"}
         </button>
-        <p className="text-right text-xs leading-5 text-[#777]">
-          答案由 AI 生成，请核对后再用于作业。支持数学公式（LaTeX）。
-        </p>
       </div>
     </div>
   );

@@ -190,6 +190,9 @@ function Welcome({ onPick }: { onPick: (text: string) => void }) {
           </button>
         ))}
       </div>
+      <p className="text-xs leading-5 text-[#777]">
+        答案由 AI 生成，请核对后再用于作业。支持数学公式（LaTeX）。
+      </p>
     </div>
   );
 }
