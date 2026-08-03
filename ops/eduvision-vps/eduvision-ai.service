@@ -10,16 +10,17 @@ Group=eduvision
 WorkingDirectory=/opt/eduvision-ai
 Environment=NODE_ENV=production
 Environment=PORT=8791
-EnvironmentFile=/etc/eduvision-ai.env
+Environment=CONFIG_FILE=/var/lib/eduvision-ai/config.env
+EnvironmentFile=/var/lib/eduvision-ai/config.env
 ExecStart=/usr/bin/npm run dev:node --workspace worker
-Restart=on-failure
+Restart=always
 RestartSec=3
 TimeoutStopSec=20
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=true
-ReadWritePaths=/opt/eduvision-ai
+ReadWritePaths=/opt/eduvision-ai /var/lib/eduvision-ai
 
 [Install]
 WantedBy=multi-user.target

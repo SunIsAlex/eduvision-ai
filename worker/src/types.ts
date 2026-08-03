@@ -32,6 +32,8 @@ export interface Env {
   DESMOS_API_KEY?: string;
   /** Optional shared password protecting every private API endpoint. */
   ACCESS_PASSWORD?: string;
+  /** Separate password for the server configuration control panel. */
+  ADMIN_ACCESS_PASSWORD?: string;
 }
 
 /**

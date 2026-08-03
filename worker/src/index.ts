@@ -7,9 +7,12 @@ import { getModelCatalog, isAvailableModel } from "./model-catalog";
 import { resolveModel, type ChatRequest, type Env } from "./types";
 import {
   authCookie,
+  adminAuthCookie,
   constantTimeEqual,
   createAuthToken,
+  createAdminAuthToken,
   isAuthenticatedRequest,
+  isAdminAuthenticatedRequest,
 } from "./auth";
 
 export const app = new Hono<{ Bindings: Env }>();
@@ -29,13 +32,59 @@ app.use(
 );
 
 const loginFailures = new Map<string, { count: number; resetAt: number }>();
+const adminLoginFailures = new Map<string, { count: number; resetAt: number }>();
 const MAX_LOGIN_FAILURES = 5;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 
 app.use("/api/*", async (c, next) => {
-  if (["/api/auth/status", "/api/auth/login"].includes(c.req.path)) return next();
+  if (
+    ["/api/auth/status", "/api/auth/login", "/api/admin/auth/status", "/api/admin/auth/login"].includes(
+      c.req.path
+    )
+  ) return next();
   if (await isAuthenticatedRequest(c.req.raw, c.env)) return next();
   return c.json({ error: "请先输入访问密码" }, 401);
+});
+
+function clientIp(headers: Headers): string {
+  return (
+    headers.get("cf-connecting-ip") ??
+    headers.get("x-real-ip") ??
+    headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    "unknown"
+  );
+}
+
+app.get("/api/admin/auth/status", async (c) => {
+  c.header("Cache-Control", "no-store");
+  return c.json({
+    configured: Boolean(c.env.ADMIN_ACCESS_PASSWORD?.trim()),
+    authenticated: await isAdminAuthenticatedRequest(c.req.raw, c.env),
+  });
+});
+
+app.post("/api/admin/auth/login", async (c) => {
+  c.header("Cache-Control", "no-store");
+  const expected = c.env.ADMIN_ACCESS_PASSWORD?.trim();
+  if (!expected) return c.json({ error: "服务器未配置 ADMIN_ACCESS_PASSWORD" }, 503);
+  const ip = clientIp(c.req.raw.headers);
+  const now = Date.now();
+  const prior = adminLoginFailures.get(ip);
+  const attempt = prior && prior.resetAt > now ? prior : { count: 0, resetAt: now + LOGIN_WINDOW_MS };
+  if (attempt.count >= MAX_LOGIN_FAILURES) {
+    c.header("Retry-After", String(Math.ceil((attempt.resetAt - now) / 1000)));
+    return c.json({ error: "尝试次数过多，请稍后再试" }, 429);
+  }
+  const body = await c.req.json<{ password?: unknown }>().catch(() => null);
+  const supplied = typeof body?.password === "string" ? body.password.slice(0, 256) : "";
+  if (!(await constantTimeEqual(supplied, expected))) {
+    attempt.count += 1;
+    adminLoginFailures.set(ip, attempt);
+    return c.json({ error: "管理员密码错误" }, 401);
+  }
+  adminLoginFailures.delete(ip);
+  c.header("Set-Cookie", adminAuthCookie(await createAdminAuthToken(expected), c.req.raw));
+  return c.json({ ok: true });
 });
 
 app.get("/api/auth/status", async (c) => {
@@ -50,11 +99,7 @@ app.post("/api/auth/login", async (c) => {
   c.header("Cache-Control", "no-store");
   const expected = c.env.ACCESS_PASSWORD?.trim();
   if (!expected) return c.json({ ok: true });
-  const ip =
-    c.req.header("cf-connecting-ip") ??
-    c.req.header("x-real-ip") ??
-    c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
-    "unknown";
+  const ip = clientIp(c.req.raw.headers);
   const now = Date.now();
   const prior = loginFailures.get(ip);
   const attempt = prior && prior.resetAt > now ? prior : { count: 0, resetAt: now + LOGIN_WINDOW_MS };

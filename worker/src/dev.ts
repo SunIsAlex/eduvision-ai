@@ -5,12 +5,12 @@
  * Usage:  npm run dev:node --workspace worker
  */
 import { serve } from "@hono/node-server";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { app } from "./index";
 import { initializeModelCatalog } from "./model-catalog";
-import { isAuthenticatedRequest } from "./auth";
+import { isAdminAuthenticatedRequest, isAuthenticatedRequest } from "./auth";
 import type { Env } from "./types";
 
 /** 构建后的前端静态资源目录（worker/src -> 项目根 -> frontend/dist）。 */
@@ -19,6 +19,8 @@ const SESSION_ROOT =
   process.env.SESSION_DATA_DIR ?? fileURLToPath(new URL("../../.session-data", import.meta.url));
 const SESSION_PATH_RE = /^\/api\/sessions\/([0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i;
 const MAX_SESSION_BYTES = 12 * 1024 * 1024;
+const CONFIG_FILE = process.env.CONFIG_FILE ?? fileURLToPath(new URL("../../.dev.vars", import.meta.url));
+const ENV_KEY_RE = /^[A-Z_][A-Z0-9_]*$/;
 
 const MIME: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -151,7 +153,57 @@ async function loadDevEnv(): Promise<Env> {
     API_MODEL: vars.API_MODEL ?? vars.AI_MODEL ?? process.env.API_MODEL ?? process.env.AI_MODEL,
     DESMOS_API_KEY: vars.DESMOS_API_KEY ?? process.env.DESMOS_API_KEY,
     ACCESS_PASSWORD: vars.ACCESS_PASSWORD ?? process.env.ACCESS_PASSWORD,
+    ADMIN_ACCESS_PASSWORD: vars.ADMIN_ACCESS_PASSWORD ?? process.env.ADMIN_ACCESS_PASSWORD,
   };
+}
+
+async function serveAdminConfig(request: Request): Promise<Response> {
+  if (!(await isAdminAuthenticatedRequest(request, runtimeEnv))) {
+    return Response.json({ error: "需要管理员权限" }, { status: 401 });
+  }
+  if (request.method === "GET") {
+    try {
+      const raw = await readFile(CONFIG_FILE, "utf8");
+      const values: Record<string, string> = {};
+      for (const line of raw.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) continue;
+        const separator = trimmed.indexOf("=");
+        if (separator < 1) continue;
+        const key = trimmed.slice(0, separator).trim();
+        if (ENV_KEY_RE.test(key)) values[key] = trimmed.slice(separator + 1);
+      }
+      return Response.json({ values }, { headers: { "Cache-Control": "no-store" } });
+    } catch {
+      return Response.json({ error: "无法读取配置文件" }, { status: 500 });
+    }
+  }
+  if (request.method !== "PUT") return new Response("Method Not Allowed", { status: 405 });
+  const body = await request.json().catch(() => null) as { values?: unknown } | null;
+  if (!body || !body.values || typeof body.values !== "object" || Array.isArray(body.values)) {
+    return Response.json({ error: "配置格式无效" }, { status: 400 });
+  }
+  const entries = Object.entries(body.values as Record<string, unknown>);
+  if (entries.length === 0 || entries.length > 100) {
+    return Response.json({ error: "配置项数量无效" }, { status: 400 });
+  }
+  const normalized: Record<string, string> = {};
+  for (const [key, value] of entries) {
+    if (!ENV_KEY_RE.test(key) || typeof value !== "string" || /[\r\n\0]/.test(value)) {
+      return Response.json({ error: `配置项 ${key} 无效` }, { status: 400 });
+    }
+    normalized[key] = value;
+  }
+  if (!normalized.ADMIN_ACCESS_PASSWORD?.trim()) {
+    return Response.json({ error: "ADMIN_ACCESS_PASSWORD 不能为空" }, { status: 400 });
+  }
+  const serialized = `${Object.keys(normalized).sort().map((key) => `${key}=${normalized[key]}`).join("\n")}\n`;
+  const temporaryPath = `${CONFIG_FILE}.${crypto.randomUUID()}.tmp`;
+  await writeFile(temporaryPath, serialized, { mode: 0o600 });
+  await chmod(temporaryPath, 0o600);
+  await rename(temporaryPath, CONFIG_FILE);
+  setTimeout(() => process.exit(0), 800).unref();
+  return Response.json({ ok: true, restarting: true });
 }
 
 const port = Number(process.env.PORT ?? 8787);
@@ -162,6 +214,7 @@ await initializeModelCatalog(runtimeEnv);
 serve({
   fetch: async (request) => {
     const url = new URL(request.url);
+    if (url.pathname === "/api/admin/config") return serveAdminConfig(request);
     const sessionMatch = url.pathname.match(SESSION_PATH_RE);
     if (sessionMatch?.[1]) {
       if (!(await isAuthenticatedRequest(request, runtimeEnv))) {
