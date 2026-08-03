@@ -10,7 +10,13 @@ export function useChat() {
   const [image, setImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [thinking, setThinking] = useState<ThinkingStep[]>([]);
-  const [thinkingEnabled, setThinkingEnabled] = useState(false);
+  const [thinkingEnabled, setThinkingEnabled] = useState(() => {
+    try {
+      return window.localStorage.getItem("eduvision-thinking-enabled") === "true";
+    } catch {
+      return false;
+    }
+  });
   // 上下文断点：之前的 user 消息条数。点击“结束上下文”后，之后的提问
   // 只把断点之后的对话作为历史发送，不再带上前面的题目。
   const [contextBreak, setContextBreak] = useState(0);
@@ -24,6 +30,14 @@ export function useChat() {
     );
     if (!streaming) saveMessages(messages);
   }, [messages]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("eduvision-thinking-enabled", String(thinkingEnabled));
+    } catch {
+      // Storage may be unavailable in private or restricted browser contexts.
+    }
+  }, [thinkingEnabled]);
 
   const send = useCallback(async () => {
     const question = input.trim();

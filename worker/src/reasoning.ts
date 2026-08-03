@@ -161,7 +161,7 @@ export async function* streamAnswer(
   let toolCallCount = 0;
   let corrections = 0;
   console.log(
-    `[request] ${requestId} model=${model} requiredTool=${javascriptRequired ? "javascript" : calculatorRequired ? "calculator" : "none"} image=${Boolean(input.image)} question=${input.question.slice(0, 120)}`
+    `[request] ${requestId} model=${model} thinking=${input.thinking === true} requiredTool=${javascriptRequired ? "javascript" : calculatorRequired ? "calculator" : "none"} image=${Boolean(input.image)} question=${input.question.slice(0, 120)}`
   );
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
@@ -184,13 +184,16 @@ export async function* streamAnswer(
     }));
     const params: MessageCreateParamsStreaming = {
       model,
-      max_tokens: input.thinking ? MAX_ANSWER_TOKENS + 2048 : MAX_ANSWER_TOKENS,
+      max_tokens: input.thinking ? MAX_ANSWER_TOKENS + 4096 : MAX_ANSWER_TOKENS,
       system: TEACHER_SYSTEM,
       stream: true,
       messages,
       tools,
       ...(input.thinking
-        ? { thinking: { type: "enabled" as const, budget_tokens: 2048, display: "summarized" as const } }
+        ? {
+            thinking: { type: "adaptive" as const, display: "summarized" as const },
+            output_config: { effort: "high" as const },
+          }
         : { temperature: 0.2 }),
       ...(mustCallTool && requiredTool
         ? { tool_choice: { type: "tool" as const, name: requiredTool } }
