@@ -3,7 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import { repairAdjacentDisplayMath } from "../lib/utils";
+import { normalizeLatexDelimiters, repairAdjacentDisplayMath } from "../lib/utils";
 
 /**
  * Streaming text is often mid-syntax (unclosed $$ or code fences). If a
@@ -32,13 +32,13 @@ class MarkdownErrorBoundary extends Component<
 
 /** Markdown + GFM tables + LaTeX rendering. */
 export function Markdown({ content }: { content: string }) {
-  const repairedContent = repairAdjacentDisplayMath(content);
+  const repairedContent = repairAdjacentDisplayMath(normalizeLatexDelimiters(content));
   return (
     <div className="markdown-body">
       <MarkdownErrorBoundary>
         <ReactMarkdown
           remarkPlugins={[remarkGfm, remarkMath]}
-          rehypePlugins={[[rehypeKatex, { throwOnError: false }]]}
+          rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: false, trust: false }]]}
           components={{
             a: ({ href, children }) => (
               <a href={href} target="_blank" rel="noreferrer">
