@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bug, GraduationCap, RotateCcw, Sparkles } from "lucide-react";
+import { Bug, Check, GraduationCap, Link2, RotateCcw, Sparkles } from "lucide-react";
 import { Composer } from "./components/Composer";
 import { ChatMessage } from "./components/ChatMessage";
 import { useChat } from "./hooks/useChat";
@@ -13,6 +13,7 @@ const EXAMPLES = [
 export default function App() {
   const chat = useChat();
   const [debug, setDebug] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
   // Whether the user is pinned to the bottom of the message list. While
   // streaming, we only auto-scroll when they're already at/near the bottom,
@@ -73,6 +74,24 @@ export default function App() {
               </button>
             {chat.messages.length > 0 && (
               <>
+              <button
+                type="button"
+                onClick={() => {
+                  void navigator.clipboard.writeText(window.location.href).then(() => {
+                    setLinkCopied(true);
+                    window.setTimeout(() => setLinkCopied(false), 1500);
+                  });
+                }}
+                title="复制可恢复和调试当前会话的链接"
+                className="flex items-center gap-1.5 rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs text-slate-400 transition hover:border-slate-500 hover:text-slate-200"
+              >
+                {linkCopied ? (
+                  <Check className="h-3.5 w-3.5 text-emerald-400" />
+                ) : (
+                  <Link2 className="h-3.5 w-3.5" />
+                )}
+                {linkCopied ? "已复制" : "会话链接"}
+              </button>
               <button
                 type="button"
                 onClick={chat.endContext}
