@@ -8,7 +8,7 @@ import { serve } from "@hono/node-server";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
-import app from "./index";
+import { app } from "./index";
 import type { Env } from "./types";
 
 /** 构建后的前端静态资源目录（worker/src -> 项目根 -> frontend/dist）。 */
