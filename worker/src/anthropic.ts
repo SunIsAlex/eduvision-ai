@@ -1,4 +1,5 @@
 import { DEFAULT_BASE_URL, type Env } from "./types";
+import { createOpenAIStream } from "./openai";
 
 export type ContentBlock = Record<string, unknown> & { type: string };
 export type MessageParam = { role: "user" | "assistant"; content: string | ContentBlock[] };
@@ -15,6 +16,9 @@ export function createClient(env: Env) {
   return {
     messages: {
       async create(params: MessageCreateParamsStreaming): Promise<AsyncIterable<RawMessageStreamEvent>> {
+        if (!params.model.toLowerCase().startsWith("claude")) {
+          return createOpenAIStream(env, params);
+        }
         const response = await fetch(`${baseURL}/v1/messages`, {
           method: "POST",
           headers: {
