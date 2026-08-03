@@ -1,0 +1,2 @@
+openclaw ALL=(root) NOPASSWD: /usr/local/sbin/openclaw-eduvision-root status
+openclaw ALL=(root) NOPASSWD: /usr/local/sbin/openclaw-eduvision-root deploy
