@@ -27,6 +27,10 @@ export const TOOL_DEFINITIONS = [
       parameters: {
         type: "object",
         properties: {
+          intention: {
+            type: "string",
+            description: "用一句简短中文说明绘图目的，例如“展示函数 y=sin²x 在 [0,π] 上的形状”。",
+          },
           expressions: {
             type: "array",
             minItems: 1,
@@ -52,7 +56,7 @@ export const TOOL_DEFINITIONS = [
           },
           degreeMode: { type: "boolean", description: "三角函数是否使用角度制，默认弧度制" },
         },
-        required: ["expressions"],
+        required: ["intention", "expressions"],
       },
     },
   },
@@ -79,9 +83,13 @@ export const TOOL_DEFINITIONS = [
       parameters: {
         type: "object",
         properties: {
+          intention: {
+            type: "string",
+            description: "用一句简短中文说明计算目的，明确算出的物理量或变量名，例如“计算溶液的 pH”或“求速度 v”。",
+          },
           expression: { type: "string", description: "要计算的数学表达式，只放表达式本身，不要解释" },
         },
-        required: ["expression"],
+        required: ["intention", "expression"],
       },
     },
   },
@@ -95,8 +103,14 @@ export const TOOL_DEFINITIONS = [
           "枚举示例：\nlet count=0;\nfor(let a=1;a<=6;a++){for(let b=1;b<=6;b++){if(a+b===7)count++;}}\nconsole.log(count)",
       parameters: {
         type: "object",
-        properties: { code: { type: "string", description: "要执行的 JavaScript 代码" } },
-        required: ["code"],
+        properties: {
+          intention: {
+            type: "string",
+            description: "用一句简短中文说明数值求解目的，明确要求出的变量或要验证的残差，例如“求 AgCl 溶解度 s 并验证电荷守恒”。",
+          },
+          code: { type: "string", description: "要执行的 JavaScript 代码" },
+        },
+        required: ["intention", "code"],
       },
     },
   },

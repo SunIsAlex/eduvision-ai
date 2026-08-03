@@ -200,7 +200,10 @@ export async function* streamAnswer(
 
   if (directExpression) {
     const toolCallId = `calculator_${crypto.randomUUID()}`;
-    const args = JSON.stringify({ expression: directExpression });
+    const args = JSON.stringify({
+      intention: "计算给定算式的值",
+      expression: directExpression,
+    });
     yield {
       kind: "tool_call",
       requestId,

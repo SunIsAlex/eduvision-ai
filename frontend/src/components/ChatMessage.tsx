@@ -19,10 +19,20 @@ function prettyArgs(raw: string): string {
   try {
     const obj = JSON.parse(raw) as Record<string, unknown>;
     return Object.entries(obj)
+      .filter(([key]) => key !== "intention")
       .map(([k, v]) => `${k}=${String(v)}`)
       .join(" ");
   } catch {
     return raw;
+  }
+}
+
+function getToolIntention(raw: string): string | null {
+  try {
+    const value = (JSON.parse(raw) as Record<string, unknown>).intention;
+    return typeof value === "string" && value.trim() ? value.trim().slice(0, 200) : null;
+  } catch {
+    return null;
   }
 }
 
@@ -243,6 +253,7 @@ export function ChatMessage({ message, thinking, showDebug = false }: Props) {
               const running = t.status === "running";
               const isCalc = t.name === "calculator";
               const isPlot = t.name === "function_plot";
+              const intention = getToolIntention(t.args);
               return (
                 <div
                   key={t.toolCallId}
@@ -274,6 +285,11 @@ export function ChatMessage({ message, thinking, showDebug = false }: Props) {
                       <TriangleAlert className="h-3.5 w-3.5 shrink-0 text-red-400" />
                     )}
                   </div>
+                  {intention && (
+                    <div className="tool-intention mt-2 rounded-lg bg-[#222] px-3 py-2 text-xs text-[#b4b4b4]">
+                      <Markdown content={intention} />
+                    </div>
+                  )}
                   {isCalc && <CalculatorExpression raw={t.args} />}
                   {isPlot && <FunctionPlot raw={t.args} />}
                   {t.output && !isPlot && (
