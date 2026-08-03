@@ -30,6 +30,8 @@ export interface Env {
   API_MODEL?: string;
   /** Public browser API key issued by Desmos for production embedding. */
   DESMOS_API_KEY?: string;
+  /** Optional shared password protecting every private API endpoint. */
+  ACCESS_PASSWORD?: string;
 }
 
 /**

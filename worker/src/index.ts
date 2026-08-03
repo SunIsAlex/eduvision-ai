@@ -5,6 +5,12 @@ import { runPipeline } from "./stream";
 import { deliverBrowserToolResult } from "./toolbridge";
 import { getModelCatalog, isAvailableModel } from "./model-catalog";
 import { resolveModel, type ChatRequest, type Env } from "./types";
+import {
+  authCookie,
+  constantTimeEqual,
+  createAuthToken,
+  isAuthenticatedRequest,
+} from "./auth";
 
 export const app = new Hono<{ Bindings: Env }>();
 
@@ -21,6 +27,57 @@ app.use(
     allowMethods: ["GET", "POST", "OPTIONS"],
   })
 );
+
+const loginFailures = new Map<string, { count: number; resetAt: number }>();
+const MAX_LOGIN_FAILURES = 5;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+
+app.use("/api/*", async (c, next) => {
+  if (["/api/auth/status", "/api/auth/login"].includes(c.req.path)) return next();
+  if (await isAuthenticatedRequest(c.req.raw, c.env)) return next();
+  return c.json({ error: "请先输入访问密码" }, 401);
+});
+
+app.get("/api/auth/status", async (c) => {
+  c.header("Cache-Control", "no-store");
+  return c.json({
+    required: Boolean(c.env.ACCESS_PASSWORD?.trim()),
+    authenticated: await isAuthenticatedRequest(c.req.raw, c.env),
+  });
+});
+
+app.post("/api/auth/login", async (c) => {
+  c.header("Cache-Control", "no-store");
+  const expected = c.env.ACCESS_PASSWORD?.trim();
+  if (!expected) return c.json({ ok: true });
+  const ip =
+    c.req.header("cf-connecting-ip") ??
+    c.req.header("x-real-ip") ??
+    c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
+    "unknown";
+  const now = Date.now();
+  const prior = loginFailures.get(ip);
+  const attempt = prior && prior.resetAt > now ? prior : { count: 0, resetAt: now + LOGIN_WINDOW_MS };
+  if (attempt.count >= MAX_LOGIN_FAILURES) {
+    c.header("Retry-After", String(Math.ceil((attempt.resetAt - now) / 1000)));
+    return c.json({ error: "尝试次数过多，请稍后再试" }, 429);
+  }
+  let body: { password?: unknown };
+  try {
+    body = await c.req.json<typeof body>();
+  } catch {
+    return c.json({ error: "请求格式无效" }, 400);
+  }
+  const supplied = typeof body.password === "string" ? body.password.slice(0, 256) : "";
+  if (!(await constantTimeEqual(supplied, expected))) {
+    attempt.count += 1;
+    loginFailures.set(ip, attempt);
+    return c.json({ error: "访问密码错误" }, 401);
+  }
+  loginFailures.delete(ip);
+  c.header("Set-Cookie", authCookie(await createAuthToken(expected), c.req.raw));
+  return c.json({ ok: true });
+});
 
 app.get("/health", (c) =>
   c.json({

@@ -10,6 +10,7 @@ import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { app } from "./index";
 import { initializeModelCatalog } from "./model-catalog";
+import { isAuthenticatedRequest } from "./auth";
 import type { Env } from "./types";
 
 /** 构建后的前端静态资源目录（worker/src -> 项目根 -> frontend/dist）。 */
@@ -149,6 +150,7 @@ async function loadDevEnv(): Promise<Env> {
     API_URL: vars.API_URL ?? process.env.API_URL,
     API_MODEL: vars.API_MODEL ?? vars.AI_MODEL ?? process.env.API_MODEL ?? process.env.AI_MODEL,
     DESMOS_API_KEY: vars.DESMOS_API_KEY ?? process.env.DESMOS_API_KEY,
+    ACCESS_PASSWORD: vars.ACCESS_PASSWORD ?? process.env.ACCESS_PASSWORD,
   };
 }
 
@@ -161,7 +163,12 @@ serve({
   fetch: async (request) => {
     const url = new URL(request.url);
     const sessionMatch = url.pathname.match(SESSION_PATH_RE);
-    if (sessionMatch?.[1]) return serveSession(request, sessionMatch[1]);
+    if (sessionMatch?.[1]) {
+      if (!(await isAuthenticatedRequest(request, runtimeEnv))) {
+        return Response.json({ error: "请先输入访问密码" }, { status: 401 });
+      }
+      return serveSession(request, sessionMatch[1]);
+    }
     const isBackend =
       url.pathname.startsWith("/api") ||
       url.pathname.startsWith("/media") ||

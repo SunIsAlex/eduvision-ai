@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bug, Check, GraduationCap, Link2, RotateCcw, Sparkles } from "lucide-react";
+import { Bug, Check, GraduationCap, Link2, Loader2, LockKeyhole, RotateCcw, Sparkles } from "lucide-react";
 import { Composer } from "./components/Composer";
 import { ChatMessage } from "./components/ChatMessage";
 import { useChat } from "./hooks/useChat";
@@ -11,6 +11,102 @@ const EXAMPLES = [
 ];
 
 export default function App() {
+  const [authState, setAuthState] = useState<"checking" | "locked" | "open">("checking");
+
+  useEffect(() => {
+    let active = true;
+    void fetch("/api/auth/status", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("鉴权状态读取失败");
+        return response.json() as Promise<{ authenticated?: boolean }>;
+      })
+      .then((status) => {
+        if (active) setAuthState(status.authenticated ? "open" : "locked");
+      })
+      .catch(() => {
+        if (active) setAuthState("locked");
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (authState === "checking") {
+    return (
+      <div className="flex h-full items-center justify-center bg-[#212121] text-[#b4b4b4]">
+        <Loader2 className="h-5 w-5 animate-spin" aria-label="正在验证访问权限" />
+      </div>
+    );
+  }
+  if (authState === "locked") return <LoginScreen onSuccess={() => setAuthState("open")} />;
+  return <ChatApp />;
+}
+
+function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  return (
+    <div className="flex h-full items-center justify-center bg-[#212121] px-5 text-[#ececec]">
+      <form
+        className="w-full max-w-sm rounded-3xl border border-[#424242] bg-[#2b2b2b] p-7 shadow-2xl shadow-black/25"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!password || loading) return;
+          setLoading(true);
+          setError("");
+          void fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ password }),
+          })
+            .then(async (response) => {
+              const body = (await response.json().catch(() => ({}))) as { error?: string };
+              if (!response.ok) throw new Error(body.error ?? `登录失败（${response.status}）`);
+              onSuccess();
+            })
+            .catch((reason: unknown) => {
+              setError(reason instanceof Error ? reason.message : "登录失败");
+              setPassword("");
+            })
+            .finally(() => setLoading(false));
+        }}
+      >
+        <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-500">
+          <LockKeyhole className="h-6 w-6 text-white" />
+        </div>
+        <h1 className="text-xl font-semibold tracking-tight">访问 EduVision AI</h1>
+        <p className="mt-2 text-sm leading-6 text-[#a0a0a0]">请输入访问密码后继续。</p>
+        <label className="mt-6 block">
+          <span className="sr-only">访问密码</span>
+          <input
+            autoFocus
+            type="password"
+            inputMode="numeric"
+            autoComplete="current-password"
+            value={password}
+            disabled={loading}
+            onChange={(event) => setPassword(event.target.value)}
+            placeholder="访问密码"
+            className="w-full rounded-2xl border border-[#4a4a4a] bg-[#212121] px-4 py-3 text-base tracking-wider outline-none transition placeholder:tracking-normal placeholder:text-[#777] focus:border-brand-500 disabled:opacity-60"
+          />
+        </label>
+        {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+        <button
+          type="submit"
+          disabled={!password || loading}
+          className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-400 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+          进入
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function ChatApp() {
   const chat = useChat();
   const [debug, setDebug] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
