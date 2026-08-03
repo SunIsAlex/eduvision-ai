@@ -70,7 +70,9 @@ export async function createOpenAIStream(
   const baseURL = (env.API_URL ?? DEFAULT_BASE_URL).replace(/\/$/, "");
   const summarizedThinking = Boolean(params.thinking);
   const supportsReasoningEffort = /^(?:gpt-|o\d|codex)/i.test(params.model);
-  const system = String(params.system ?? "") + (summarizedThinking
+  const system = String(params.system ?? "") +
+    "\n\nLaTeX 输出要求：每个数学分隔符及花括号必须成对闭合，尤其检查 \\frac、\\sqrt、上下标、\\text 和 \\tag 的参数。" +
+    (summarizedThinking
     ? "\n\n当前已开启思考摘要。你必须严格按以下顺序输出：先输出 <reasoning_summary>，接着用 1～3 句写给学生看的简短思路摘要，再输出 </reasoning_summary>，最后输出正常答案。摘要只写关键方法和检查点，不写内部自我对话，不重复完整解答。摘要使用自然连续的短句，不使用 Markdown 粗体、标题或列表。标签必须原样输出且不得放入 Markdown 代码块。"
     : "");
   const body = {
