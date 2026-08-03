@@ -49,7 +49,15 @@ export async function* runPipeline(
   }
 
   const model = resolveModel(env.API_MODEL);
-  yield thinking(request.image ? "正在阅读图片并解题…" : "正在理解题目…");
+  yield thinking(
+    request.thinking === true
+      ? request.image
+        ? "Claude 正在阅读图片并深度思考…"
+        : "Claude 正在深度思考…"
+      : request.image
+        ? "Claude 正在阅读图片并分析题目…"
+        : "Claude 正在分析题目…"
+  );
 
   let emittedContent = false;
   try {

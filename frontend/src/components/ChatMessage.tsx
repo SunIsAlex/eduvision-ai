@@ -84,6 +84,19 @@ function CalculatorExpression({ raw }: { raw: string }) {
 export function ChatMessage({ message, thinking, showDebug = false }: Props) {
   const isUser = message.role === "user";
   const reasoningRef = useRef<HTMLDivElement>(null);
+  const [waitingSeconds, setWaitingSeconds] = useState(0);
+
+  useEffect(() => {
+    if (message.status !== "streaming" || !thinking?.length) {
+      setWaitingSeconds(0);
+      return;
+    }
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      setWaitingSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [message.status, Boolean(thinking?.length)]);
 
   // Keep the live thinking block pinned to its latest content while streaming.
   useEffect(() => {
@@ -131,13 +144,18 @@ export function ChatMessage({ message, thinking, showDebug = false }: Props) {
         )}
 
         {thinking && thinking.length > 0 && (
-          <div className="mb-2 space-y-1 rounded-lg bg-slate-900/60 px-3 py-2">
-            {thinking.map((step, i) => (
-              <p key={i} className="flex items-center gap-2 text-[13px] text-slate-400">
-                <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-emerald-400" />
-                {step.text}
-              </p>
-            ))}
+          <div className="mb-2 rounded-lg border border-emerald-500/20 bg-slate-900/70 px-3 py-2">
+            <p className="flex items-center gap-2 text-[13px] text-slate-300">
+              <Brain className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+              <span className="font-medium">Claude 正在思考</span>
+              <span className="ml-auto tabular-nums text-[11px] text-slate-500">
+                {waitingSeconds}s
+              </span>
+            </p>
+            <p className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+              <Loader2 className="h-3 w-3 shrink-0 animate-spin text-emerald-400" />
+              {thinking[thinking.length - 1]?.text}
+            </p>
           </div>
         )}
 
