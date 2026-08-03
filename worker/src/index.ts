@@ -34,12 +34,13 @@ app.get("/health", (c) =>
 );
 
 /** Public runtime browser configuration. Desmos API keys are client-visible by design. */
-app.get("/api/config", (c) =>
-  c.json({
+app.get("/api/config", (c) => {
+  c.header("Cache-Control", "no-store");
+  return c.json({
     desmosEnabled: Boolean(c.env.DESMOS_API_KEY?.trim()),
     desmosApiKey: c.env.DESMOS_API_KEY?.trim() || undefined,
-  })
-);
+  });
+});
 
 /**
  * POST /api/chat/stream — Server-Sent Events endpoint.
