@@ -34,6 +34,12 @@ export interface Env {
   ACCESS_PASSWORD?: string;
   /** Separate password for the server configuration control panel. */
   ADMIN_ACCESS_PASSWORD?: string;
+  /** Maximum number of simultaneous upstream model streams per Node process. */
+  UPSTREAM_MAX_CONCURRENCY?: string;
+  /** Maximum number of requests waiting for an upstream stream slot. */
+  UPSTREAM_MAX_QUEUE?: string;
+  /** Maximum queue wait in milliseconds. */
+  UPSTREAM_QUEUE_TIMEOUT_MS?: string;
 }
 
 /**

@@ -1,4 +1,5 @@
 import { DEFAULT_BASE_URL, resolveModel, type Env } from "./types";
+import { pooledFetch } from "./upstream";
 
 export interface ModelInfo {
   id: string;
@@ -15,7 +16,7 @@ export async function initializeModelCatalog(env: Env): Promise<void> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 12_000);
   try {
-    const response = await fetch(`${baseURL}/v1/models?limit=1000`, {
+    const response = await pooledFetch(`${baseURL}/v1/models?limit=1000`, {
       headers: {
         "x-api-key": env.API_KEY,
         "anthropic-version": "2023-06-01",

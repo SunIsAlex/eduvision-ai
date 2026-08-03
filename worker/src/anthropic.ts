@@ -1,5 +1,6 @@
 import { DEFAULT_BASE_URL, type Env } from "./types";
 import { createOpenAIStream } from "./openai";
+import { queuedPooledFetch } from "./upstream";
 
 export type ContentBlock = Record<string, unknown> & { type: string };
 export type MessageParam = { role: "user" | "assistant"; content: string | ContentBlock[] };
@@ -19,7 +20,7 @@ export function createClient(env: Env) {
         if (!params.model.toLowerCase().startsWith("claude")) {
           return createOpenAIStream(env, params);
         }
-        const response = await fetch(`${baseURL}/v1/messages`, {
+        const { response, release } = await queuedPooledFetch(env, `${baseURL}/v1/messages`, {
           method: "POST",
           headers: {
             "content-type": "application/json",
@@ -29,16 +30,28 @@ export function createClient(env: Env) {
           body: JSON.stringify(params),
         });
         if (!response.ok) {
-          throw new Error(`Anthropic API ${response.status}: ${(await response.text()).slice(0, 500)}`);
+          let detail = "";
+          try {
+            detail = (await response.text()).slice(0, 500);
+          } finally {
+            release();
+          }
+          throw new Error(`Anthropic API ${response.status}: ${detail}`);
         }
-        if (!response.body) throw new Error("Anthropic API 未返回数据流");
-        return parseSse(response.body);
+        if (!response.body) {
+          release();
+          throw new Error("Anthropic API 未返回数据流");
+        }
+        return parseSse(response.body, release);
       },
     },
   };
 }
 
-async function* parseSse(body: ReadableStream<Uint8Array>): AsyncGenerator<RawMessageStreamEvent> {
+async function* parseSse(
+  body: ReadableStream<Uint8Array>,
+  release: () => void
+): AsyncGenerator<RawMessageStreamEvent> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -58,6 +71,7 @@ async function* parseSse(body: ReadableStream<Uint8Array>): AsyncGenerator<RawMe
     }
   } finally {
     reader.releaseLock();
+    release();
   }
 }
 

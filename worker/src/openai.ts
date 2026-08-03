@@ -5,6 +5,7 @@ import type {
   MessageParam,
   RawMessageStreamEvent,
 } from "./anthropic";
+import { queuedPooledFetch } from "./upstream";
 
 type OpenAIMessage = Record<string, unknown>;
 
@@ -97,7 +98,7 @@ export async function createOpenAIStream(
         }
       : {}),
   };
-  const response = await fetch(`${baseURL}/v1/chat/completions`, {
+  const { response, release } = await queuedPooledFetch(env, `${baseURL}/v1/chat/completions`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -106,10 +107,19 @@ export async function createOpenAIStream(
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    throw new Error(`OpenAI API ${response.status}: ${(await response.text()).slice(0, 500)}`);
+    let detail = "";
+    try {
+      detail = (await response.text()).slice(0, 500);
+    } finally {
+      release();
+    }
+    throw new Error(`OpenAI API ${response.status}: ${detail}`);
   }
-  if (!response.body) throw new Error("OpenAI API 未返回数据流");
-  return translateOpenAIStream(response.body, summarizedThinking);
+  if (!response.body) {
+    release();
+    throw new Error("OpenAI API 未返回数据流");
+  }
+  return translateOpenAIStream(response.body, summarizedThinking, release);
 }
 
 const SUMMARY_OPEN = "<reasoning_summary>";
@@ -117,7 +127,8 @@ const SUMMARY_CLOSE = "</reasoning_summary>";
 
 async function* translateOpenAIStream(
   body: ReadableStream<Uint8Array>,
-  summarizedThinking: boolean
+  summarizedThinking: boolean,
+  release: () => void
 ): AsyncGenerator<RawMessageStreamEvent> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
@@ -233,6 +244,7 @@ async function* translateOpenAIStream(
     }
   } finally {
     reader.releaseLock();
+    release();
   }
   if (summaryBuffer) {
     const finalSummaryMode = summaryMode as string;

@@ -14,6 +14,7 @@ import {
   isAuthenticatedRequest,
   isAdminAuthenticatedRequest,
 } from "./auth";
+import { getUpstreamStatus } from "./upstream";
 
 export const app = new Hono<{ Bindings: Env }>();
 
@@ -132,6 +133,7 @@ app.get("/health", (c) =>
       answer: resolveModel(c.env.API_MODEL),
     },
     uploads: false,
+    upstream: getUpstreamStatus(c.env),
     timestamp: new Date().toISOString(),
   })
 );
