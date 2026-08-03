@@ -21,6 +21,44 @@ export const TOOL_DEFINITIONS = [
   {
     type: "function",
     function: {
+      name: "function_plot",
+      description:
+        "在答案中附加可交互函数图像。仅用于帮助学生观察已通过导数、代数或数值工具确认的性质，绝不能把看图当作零点、单调性、凹凸性或最值的证明。图像在客户端异步加载，不要等待或声称图像本身完成了验证。latex 使用 Desmos LaTeX，例如 y=\\sin^2(x)、y=x^2、(1,2)。最多 8 个表达式；viewport 应覆盖题目实际区间。仅当图像明显有助理解或用户明确要求绘图时调用。",
+      parameters: {
+        type: "object",
+        properties: {
+          expressions: {
+            type: "array",
+            minItems: 1,
+            maxItems: 8,
+            items: {
+              type: "object",
+              properties: {
+                latex: { type: "string", description: "Desmos LaTeX 表达式" },
+                color: { type: "string", description: "可选 #RRGGBB 颜色" },
+                hidden: { type: "boolean", description: "是否默认隐藏" },
+                label: { type: "string", description: "可选短标签" },
+              },
+              required: ["latex"],
+            },
+          },
+          viewport: {
+            type: "object",
+            properties: {
+              xMin: { type: "number" }, xMax: { type: "number" },
+              yMin: { type: "number" }, yMax: { type: "number" },
+            },
+            required: ["xMin", "xMax", "yMin", "yMax"],
+          },
+          degreeMode: { type: "boolean", description: "三角函数是否使用角度制，默认弧度制" },
+        },
+        required: ["expressions"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "calculator",
       description:
         "精确计算数学表达式（服务端加固版 mathjs，BigNumber 高精度，0.1+0.2=0.3）。expression 只写表达式本身，不要解释、不要写等号。\n" +
@@ -67,5 +105,6 @@ export const TOOL_DEFINITIONS = [
 /** Calculator is safe and fast server-side; arbitrary JavaScript stays in the browser sandbox. */
 export const TOOL_EXECUTORS: Record<string, ToolExecutor> = {
   calculator: "server",
+  function_plot: "server",
   javascript: "browser",
 };

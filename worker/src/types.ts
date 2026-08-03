@@ -26,6 +26,8 @@ export interface Env {
   API_URL?: string;
   /** Override the text reasoning/answering model (see MODELS). */
   API_MODEL?: string;
+  /** Public browser API key issued by Desmos for production embedding. */
+  DESMOS_API_KEY?: string;
 }
 
 /**

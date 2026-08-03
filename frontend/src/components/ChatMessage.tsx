@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Bot, Brain, Calculator, Check, Code, Copy, Loader2, TriangleAlert, User } from "lucide-react";
+import { Bot, Brain, Calculator, Check, Code, Copy, LineChart, Loader2, TriangleAlert, User } from "lucide-react";
 import { Markdown } from "./Markdown";
+import { FunctionPlot } from "./FunctionPlot";
 import type { ChatMessage as Message, ThinkingStep } from "../lib/types";
 import { cn } from "../lib/utils";
 
@@ -224,6 +225,7 @@ export function ChatMessage({ message, thinking, showDebug = false }: Props) {
             {message.tools.map((t) => {
               const running = t.status === "running";
               const isCalc = t.name === "calculator";
+              const isPlot = t.name === "function_plot";
               return (
                 <div
                   key={t.toolCallId}
@@ -232,11 +234,13 @@ export function ChatMessage({ message, thinking, showDebug = false }: Props) {
                   <div className="flex items-center gap-2 text-xs text-slate-300">
                     {isCalc ? (
                       <Calculator className="h-3.5 w-3.5 shrink-0 text-amber-400" />
+                    ) : isPlot ? (
+                      <LineChart className="h-3.5 w-3.5 shrink-0 text-violet-400" />
                     ) : (
                       <Code className="h-3.5 w-3.5 shrink-0 text-sky-400" />
                     )}
-                    <span className="font-medium">{isCalc ? "计算器" : "JavaScript 沙箱"}</span>
-                    {!isCalc && (
+                    <span className="font-medium">{isCalc ? "计算器" : isPlot ? "函数图像" : "JavaScript 沙箱"}</span>
+                    {!isCalc && !isPlot && (
                       <span
                         className="min-w-0 flex-1 truncate font-mono text-[11px] text-slate-500"
                         title={prettyArgs(t.args)}
@@ -244,7 +248,7 @@ export function ChatMessage({ message, thinking, showDebug = false }: Props) {
                         {prettyArgs(t.args)}
                       </span>
                     )}
-                    {isCalc && <span className="flex-1" />}
+                    {(isCalc || isPlot) && <span className="flex-1" />}
                     {running ? (
                       <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-emerald-400" />
                     ) : t.status === "done" ? (
@@ -254,7 +258,8 @@ export function ChatMessage({ message, thinking, showDebug = false }: Props) {
                     )}
                   </div>
                   {isCalc && <CalculatorExpression raw={t.args} />}
-                  {t.output && (
+                  {isPlot && <FunctionPlot raw={t.args} />}
+                  {t.output && !isPlot && (
                     <pre className="mt-1.5 max-h-32 overflow-auto whitespace-pre-wrap rounded bg-slate-950/60 px-2 py-1.5 font-mono text-[11px] leading-4 text-emerald-300">
                       {t.output}
                     </pre>

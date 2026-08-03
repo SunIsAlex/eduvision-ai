@@ -67,6 +67,8 @@ VPS 文件和脚本位于 `ops/eduvision-vps/`：
 API_URL=https://api.mytokk.com
 API_KEY=...
 API_MODEL=claude-sonnet-4-6
+# 可选：向 Desmos 申请的生产嵌入 key；缺省时绘图卡片降级显示表达式
+DESMOS_API_KEY=...
 ```
 
 部署：
