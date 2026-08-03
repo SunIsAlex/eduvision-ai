@@ -55,7 +55,7 @@ export function requiresJavaScript(question: string): boolean {
   return JAVASCRIPT_REQUIRED_RE.test(question);
 }
 
-/** Build the chat messages: system + recent history + current question/image. */
+/** Build the complete active conversation plus the current question/image. */
 function buildMessages(input: {
   question: string;
   image?: string;
@@ -64,9 +64,11 @@ function buildMessages(input: {
   const messages: ChatMessage[] = [];
 
   if (input.history && input.history.length > 0) {
-    for (const msg of input.history.slice(-6)) {
-      // Historical images are omitted to keep follow-up requests compact.
-      if (msg.content.trim()) messages.push({ role: msg.role, content: msg.content });
+    for (const msg of input.history) {
+      const content = msg.content.trim() || (msg.image ? "用户在此轮上传了一张题目图片。" : "");
+      if (content || msg.image) {
+        messages.push({ role: msg.role, content, ...(msg.image ? { image: msg.image } : {}) });
+      }
     }
   }
 
@@ -163,7 +165,7 @@ export async function* streamAnswer(
   let toolCallCount = 0;
   let corrections = 0;
   console.log(
-    `[request] ${requestId} model=${model} thinking=${input.thinking === true} requiredTool=${javascriptRequired ? "javascript" : calculatorRequired ? "calculator" : "none"} image=${Boolean(input.image)} question=${input.question.slice(0, 120)}`
+    `[request] ${requestId} model=${model} thinking=${input.thinking === true} requiredTool=${javascriptRequired ? "javascript" : calculatorRequired ? "calculator" : "none"} image=${Boolean(input.image)} history=${input.history?.length ?? 0} historyImages=${input.history?.filter((message) => Boolean(message.image)).length ?? 0} question=${input.question.slice(0, 120)}`
   );
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {

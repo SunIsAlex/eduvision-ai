@@ -17,8 +17,8 @@ export function useChat() {
       return false;
     }
   });
-  // 上下文断点：之前的 user 消息条数。点击“结束上下文”后，之后的提问
-  // 只把断点之后的对话作为历史发送，不再带上前面的题目。
+  // 上下文断点是 messages 数组下标。点击“结束上下文”后，下一次请求
+  // 只发送断点之后的完整 user/assistant 对话（包括历史图片）。
   const [contextBreak, setContextBreak] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -59,9 +59,12 @@ export function useChat() {
     };
 
     const history = messages
-      .filter((m) => m.role === "user")
       .slice(contextBreak)
-      .slice(-4)
+      .filter(
+        (m) =>
+          m.status !== "streaming" &&
+          (m.content.trim().length > 0 || typeof m.image === "string")
+      )
       .map((m) => ({ role: m.role, content: m.content, image: m.image }));
 
     setMessages((prev) => [...prev, userMessage, assistantMessage]);
@@ -181,8 +184,7 @@ export function useChat() {
 
   /** 结束当前上下文：断点设在现有对话末尾，下一道题不带前面的上下文。 */
   const endContext = useCallback(() => {
-    const userCount = messages.filter((m) => m.role === "user").length;
-    setContextBreak(userCount);
+    setContextBreak(messages.length);
     setThinking([]);
   }, [messages]);
 
