@@ -190,15 +190,15 @@ export function ChatMessage({ message, thinking, showDebug = false }: Props) {
           </details>
         )}
 
-        {/* Live chain-of-thought streamed from the thinking model. */}
+        {/* Provider-generated summarized thinking, similar to the Claude app. */}
         {message.reasoning && (
           <details
-            open
+            open={message.status === "streaming"}
             className="mb-2 overflow-hidden rounded-lg border border-slate-800 bg-slate-900/70"
           >
             <summary className="flex cursor-pointer select-none items-center gap-2 px-3 py-2 text-xs text-slate-400 transition hover:text-slate-200">
               <Brain className="h-3.5 w-3.5" />
-              思考过程
+              思考摘要
               {message.status === "streaming" && (
                 <span className="ml-auto flex items-center gap-1 text-[11px] text-emerald-400">
                   <Loader2 className="h-3 w-3 animate-spin" />
@@ -208,7 +208,7 @@ export function ChatMessage({ message, thinking, showDebug = false }: Props) {
             </summary>
             <div
               ref={reasoningRef}
-              className="scrollbar-thin max-h-56 overflow-y-auto whitespace-pre-wrap border-t border-slate-800 px-3 py-2 font-mono text-xs leading-5 text-slate-400"
+              className="scrollbar-thin max-h-56 overflow-y-auto whitespace-pre-wrap border-t border-slate-800 px-3 py-2 text-sm leading-6 text-slate-400"
             >
               {message.reasoning}
               {message.status === "streaming" && (

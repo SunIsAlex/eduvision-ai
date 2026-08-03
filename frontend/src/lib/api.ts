@@ -64,6 +64,7 @@ export async function streamChat(
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let paintDeltas = 0;
 
   try {
     for (;;) {
@@ -75,7 +76,15 @@ export async function streamChat(
       const frames = buffer.split("\n\n");
       buffer = frames.pop() ?? "";
       for (const frame of frames) {
-        await handleFrame(frame, callbacks, { requestId: request.requestId, signal });
+        const event = await handleFrame(frame, callbacks, { requestId: request.requestId, signal });
+        // One fetch chunk can contain many SSE deltas. Yield a paint frame so
+        // React does not batch the whole chunk into one visible text jump.
+        if ((event === "answer" || event === "reasoning") && ++paintDeltas % 4 === 0) {
+          await new Promise<void>((resolve) => {
+            if (document.hidden) window.setTimeout(resolve, 0);
+            else requestAnimationFrame(() => resolve());
+          });
+        }
       }
     }
     if (buffer.trim()) {
@@ -90,7 +99,7 @@ async function handleFrame(
   frame: string,
   cb: StreamCallbacks,
   ctx: { requestId: string; signal?: AbortSignal }
-): Promise<void> {
+): Promise<string> {
   let event = "message";
   const dataLines: string[] = [];
   for (const line of frame.split("\n")) {
@@ -98,7 +107,7 @@ async function handleFrame(
     else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
   }
   const data = dataLines.join("\n");
-  if (!data) return;
+  if (!data) return event;
 
   try {
     const parsed = JSON.parse(data) as {
@@ -177,6 +186,7 @@ async function handleFrame(
   } catch {
     // ignore malformed frames
   }
+  return event;
 }
 
 /** Upload an image; returns a data URL (dev fallback) or /media/ URL (R2). */

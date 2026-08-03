@@ -72,7 +72,8 @@ export async function* runPipeline(
     try {
       for await (const delta of gen) {
         if (delta.kind === "reasoning") {
-          // 模型原始思维链（reasoning_content）逐字实时推送，前端实时展示。
+          // Forward Anthropic summarized-thinking deltas live. These are not
+          // the model's private/raw chain of thought.
           yield { event: "reasoning", data: JSON.stringify({ text: delta.text }) };
         } else if (delta.kind === "content") {
           emittedContent = true;

@@ -4,7 +4,7 @@ export interface ChatMessage {
   id: string;
   role: Role;
   content: string;
-  /** Streaming chain-of-thought shown live (assistant only). */
+  /** Provider-generated summarized thinking shown live (assistant only). */
   reasoning?: string;
   /** Markdown transcription streamed from the image OCR model. */
   ocr?: string;
