@@ -189,7 +189,10 @@ function formatResult(value: unknown): string {
   if (typeof value === "boolean") return String(value);
   if (math.isBigNumber(value)) {
     if (!value.isFinite()) throw new Error("结果超出可表示范围");
-    return math.format(value, { precision: 16 });
+    // Keep everyday integers/decimals readable. mathjs otherwise switches
+    // BigNumber values such as 8,739,918 to scientific notation surprisingly
+    // early (8.739918e+6), which is poor calculator UX.
+    return math.format(value, { precision: 16, lowerExp: -12, upperExp: 21 });
   }
   return math.format(value, { precision: 16 });
 }

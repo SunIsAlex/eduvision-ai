@@ -48,6 +48,25 @@ function requiresCalculator(question: string): boolean {
   return CALCULATOR_REQUIRED_RE.test(question);
 }
 
+/**
+ * Extract a standalone calculator request which needs no model reasoning.
+ * Keeping this deliberately narrow avoids treating word problems as bare
+ * expressions while making requests such as “计算99*88282” instant and
+ * independent of a second provider round trip.
+ */
+function directCalculatorExpression(question: string): string | null {
+  const normalized = question.trim();
+  const match = normalized.match(
+    /^(?:请\s*)?(?:帮我\s*)?(?:计算|算一下|算出|求值)\s*[:：]?\s*(.+?)\s*[。！？?!]?$/i
+  );
+  const expression = match?.[1]?.trim();
+  if (!expression || expression.length > 500) return null;
+  // The hardened calculator accepts ASCII. Exclude prose, equations and
+  // assignments here; unsupported expressions fall back to Claude below.
+  if (/[^\x00-\x7F]/.test(expression) || /[=;{}'"`]/.test(expression)) return null;
+  return expression;
+}
+
 /** Text questions that need an iterative/root-finding JavaScript program. */
 const JAVASCRIPT_REQUIRED_RE =
   /(?:数值求解|迭代法?|二分法?|牛顿法?|非线性方程|联立.{0,8}方程)|(?:NH3|氨水|络合|配位|EDTA|CN[-⁻]?).{0,40}(?:溶解度|沉淀平衡)|(?:溶解度|沉淀平衡).{0,40}(?:NH3|氨水|络合|配位|EDTA|CN[-⁻]?)/i;
@@ -154,9 +173,41 @@ export async function* streamAnswer(
     thinking?: boolean;
   }
 ): AsyncGenerator<StreamDelta, void, unknown> {
-  const client = createClient(env);
   const model = input.model ?? MODELS.VISION;
   const requestId = input.requestId ?? "local";
+  const directExpression = !input.image
+    ? directCalculatorExpression(input.question)
+    : null;
+
+  if (directExpression) {
+    const toolCallId = `calculator_${crypto.randomUUID()}`;
+    const args = JSON.stringify({ expression: directExpression });
+    yield {
+      kind: "tool_call",
+      requestId,
+      toolCallId,
+      name: "calculator",
+      args,
+      executor: "server",
+    };
+    const result = await executeServerTool("calculator", args);
+    yield {
+      kind: "tool_result",
+      requestId,
+      toolCallId,
+      name: "calculator",
+      ok: result.ok,
+      output: result.output,
+    };
+    if (result.ok) {
+      yield { kind: "content", text: `${directExpression} = ${result.output}` };
+      return;
+    }
+    // Let Claude interpret or repair expressions outside the calculator's
+    // supported grammar after showing the real failed tool attempt.
+  }
+
+  const client = createClient(env);
   const messages = toAnthropicMessages(
     buildMessages({ question: input.question, image: input.image, history: input.history })
   );
