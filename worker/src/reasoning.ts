@@ -186,7 +186,7 @@ export async function* streamAnswer(
     }));
     const params: MessageCreateParamsStreaming = {
       model,
-      max_tokens: input.thinking ? MAX_ANSWER_TOKENS + 4096 : MAX_ANSWER_TOKENS,
+      max_tokens: input.thinking ? MAX_ANSWER_TOKENS + 2048 : MAX_ANSWER_TOKENS,
       system: TEACHER_SYSTEM,
       stream: true,
       messages,
@@ -194,7 +194,7 @@ export async function* streamAnswer(
       ...(input.thinking
         ? {
             thinking: { type: "adaptive" as const, display: "summarized" as const },
-            output_config: { effort: "medium" as const },
+            output_config: { effort: "low" as const },
           }
         : { temperature: 0.2 }),
       ...(mustCallTool && requiredTool
