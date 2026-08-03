@@ -67,12 +67,16 @@ export async function createOpenAIStream(
   params: MessageCreateParamsStreaming
 ): Promise<AsyncIterable<RawMessageStreamEvent>> {
   const baseURL = (env.API_URL ?? DEFAULT_BASE_URL).replace(/\/$/, "");
+  const summarizedThinking = Boolean(params.thinking);
+  const system = String(params.system ?? "") + (summarizedThinking
+    ? "\n\n当前已开启思考摘要。你必须严格按以下顺序输出：先输出 <reasoning_summary>，接着用 1～3 句写给学生看的简短思路摘要，再输出 </reasoning_summary>，最后输出正常答案。摘要只写关键方法和检查点，不写内部自我对话，不重复完整解答。标签必须原样输出且不得放入 Markdown 代码块。"
+    : "");
   const body = {
     model: params.model,
     stream: true,
     max_tokens: params.max_tokens,
     messages: [
-      { role: "system", content: String(params.system ?? "") },
+      { role: "system", content: system },
       ...toOpenAIMessages(params.messages),
     ],
     tools: params.tools.map((tool) => ({
@@ -80,6 +84,7 @@ export async function createOpenAIStream(
       function: { name: tool.name, description: tool.description, parameters: tool.input_schema },
     })),
     ...(params.temperature !== undefined ? { temperature: params.temperature } : {}),
+    ...(summarizedThinking ? { reasoning_effort: "low" } : {}),
     ...(params.tool_choice && (params.tool_choice as Record<string, unknown>).type === "tool"
       ? {
           tool_choice: {
@@ -101,11 +106,15 @@ export async function createOpenAIStream(
     throw new Error(`OpenAI API ${response.status}: ${(await response.text()).slice(0, 500)}`);
   }
   if (!response.body) throw new Error("OpenAI API 未返回数据流");
-  return translateOpenAIStream(response.body);
+  return translateOpenAIStream(response.body, summarizedThinking);
 }
 
+const SUMMARY_OPEN = "<reasoning_summary>";
+const SUMMARY_CLOSE = "</reasoning_summary>";
+
 async function* translateOpenAIStream(
-  body: ReadableStream<Uint8Array>
+  body: ReadableStream<Uint8Array>,
+  summarizedThinking: boolean
 ): AsyncGenerator<RawMessageStreamEvent> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
@@ -114,6 +123,58 @@ async function* translateOpenAIStream(
   let reasoningStarted = false;
   let finishReason: string | null = null;
   const startedTools = new Set<number>();
+  let summaryMode: "awaiting" | "summary" | "answer" = summarizedThinking ? "awaiting" : "answer";
+  let summaryBuffer = "";
+
+  function* emitContent(text: string): Generator<RawMessageStreamEvent> {
+    if (!text) return;
+    if (!textStarted) {
+      textStarted = true;
+      yield { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } };
+    }
+    yield { type: "content_block_delta", index: 0, delta: { type: "text_delta", text } };
+  }
+
+  function* emitReasoning(text: string): Generator<RawMessageStreamEvent> {
+    if (!text) return;
+    if (!reasoningStarted) {
+      reasoningStarted = true;
+      yield { type: "content_block_start", index: 1000, content_block: { type: "thinking" } };
+    }
+    yield { type: "content_block_delta", index: 1000, delta: { type: "thinking_delta", thinking: text } };
+  }
+
+  function* routeContent(text: string): Generator<RawMessageStreamEvent> {
+    summaryBuffer += text;
+    for (;;) {
+      if (summaryMode === "answer") {
+        const output = summaryBuffer;
+        summaryBuffer = "";
+        yield* emitContent(output);
+        return;
+      }
+      if (summaryMode === "awaiting") {
+        const marker = summaryBuffer.indexOf(SUMMARY_OPEN);
+        if (marker < 0) return;
+        summaryBuffer = summaryBuffer.slice(marker + SUMMARY_OPEN.length);
+        summaryMode = "summary";
+        continue;
+      }
+      const marker = summaryBuffer.indexOf(SUMMARY_CLOSE);
+      if (marker >= 0) {
+        yield* emitReasoning(summaryBuffer.slice(0, marker).trimStart());
+        summaryBuffer = summaryBuffer.slice(marker + SUMMARY_CLOSE.length).replace(/^\s+/, "");
+        summaryMode = "answer";
+        continue;
+      }
+      const safeLength = summaryBuffer.length - SUMMARY_CLOSE.length + 1;
+      if (safeLength > 0) {
+        yield* emitReasoning(summaryBuffer.slice(0, safeLength));
+        summaryBuffer = summaryBuffer.slice(safeLength);
+      }
+      return;
+    }
+  }
   try {
     for (;;) {
       const { done, value } = await reader.read();
@@ -139,11 +200,7 @@ async function* translateOpenAIStream(
           yield { type: "content_block_delta", index: 1000, delta: { type: "thinking_delta", thinking: reasoning } };
         }
         if (typeof delta.content === "string" && delta.content) {
-          if (!textStarted) {
-            textStarted = true;
-            yield { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } };
-          }
-          yield { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: delta.content } };
+          yield* routeContent(delta.content);
         }
         for (const toolCall of delta.tool_calls ?? []) {
           const index = Number(toolCall.index ?? 0) + 1;
@@ -173,6 +230,12 @@ async function* translateOpenAIStream(
     }
   } finally {
     reader.releaseLock();
+  }
+  if (summaryBuffer) {
+    const finalSummaryMode = summaryMode as string;
+    if (finalSummaryMode === "awaiting") yield* emitContent(summaryBuffer);
+    else if (finalSummaryMode === "summary") yield* emitReasoning(summaryBuffer);
+    else yield* emitContent(summaryBuffer);
   }
   yield { type: "message_delta", delta: { stop_reason: finishReason } };
 }
