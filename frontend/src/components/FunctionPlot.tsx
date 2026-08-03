@@ -99,7 +99,9 @@ export function FunctionPlot({ raw }: { raw: string }) {
       .then((Desmos) => {
         if (!active || !hostRef.current) return;
         calculator = Desmos.GraphingCalculator(hostRef.current, {
-          expressions: true,
+          // Presentation-only graph: expressions are already listed in our
+          // own compact card above, so do not expose the Desmos workspace.
+          expressions: false,
           keypad: false,
           settingsMenu: false,
           expressionsTopbar: false,
