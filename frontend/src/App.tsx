@@ -161,6 +161,10 @@ export default function App() {
         loading={chat.loading}
         thinkingEnabled={chat.thinkingEnabled}
         onThinkingEnabledChange={chat.setThinkingEnabled}
+        models={chat.models}
+        selectedModel={chat.selectedModel}
+        onSelectedModelChange={chat.setSelectedModel}
+        modelsLoading={chat.modelsLoading}
       />
     </div>
   );

@@ -18,6 +18,8 @@ export interface ChatRequest {
   thinking?: boolean;
   /** Client-generated id used to correlate browser tool results back to this stream. */
   requestId?: string;
+  /** Model selected from the server-enumerated provider catalog. */
+  model?: string;
 }
 
 /** Runtime configuration loaded from .dev.vars or process environment. */
@@ -40,7 +42,7 @@ export const MODELS = {
 /** Ignore stale SiliconFlow model overrides when using the Anthropic endpoint. */
 export function resolveModel(configured?: string): string {
   const model = configured?.trim();
-  return model?.startsWith("claude-") ? model : MODELS.VISION;
+  return model || MODELS.VISION;
 }
 
 export const DEFAULT_BASE_URL = "https://api.mytokk.com";

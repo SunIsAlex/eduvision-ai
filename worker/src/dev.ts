@@ -9,6 +9,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { app } from "./index";
+import { initializeModelCatalog } from "./model-catalog";
 import type { Env } from "./types";
 
 /** 构建后的前端静态资源目录（worker/src -> 项目根 -> frontend/dist）。 */
@@ -146,12 +147,14 @@ async function loadDevEnv(): Promise<Env> {
   return {
     API_KEY: vars.API_KEY ?? process.env.API_KEY ?? "",
     API_URL: vars.API_URL ?? process.env.API_URL,
-    API_MODEL: vars.API_MODEL ?? process.env.API_MODEL,
+    API_MODEL: vars.API_MODEL ?? vars.AI_MODEL ?? process.env.API_MODEL ?? process.env.AI_MODEL,
     DESMOS_API_KEY: vars.DESMOS_API_KEY ?? process.env.DESMOS_API_KEY,
   };
 }
 
 const port = Number(process.env.PORT ?? 8787);
+const runtimeEnv = await loadDevEnv();
+await initializeModelCatalog(runtimeEnv);
 
 // Hono's fetch signature accepts runtime configuration as the second argument.
 serve({
@@ -163,7 +166,7 @@ serve({
       url.pathname.startsWith("/api") ||
       url.pathname.startsWith("/media") ||
       url.pathname === "/health";
-    if (isBackend) return app.fetch(request, await loadDevEnv());
+    if (isBackend) return app.fetch(request, runtimeEnv);
     return serveSpa(url);
   },
   port,

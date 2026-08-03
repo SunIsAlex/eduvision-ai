@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
-import { Brain, Send, Square } from "lucide-react";
+import { Brain, Cpu, Send, Square } from "lucide-react";
 import { ImageUpload } from "./ImageUpload";
 import { cn } from "../lib/utils";
+import type { ModelOption } from "../lib/types";
 
 interface Props {
   value: string;
@@ -14,6 +15,10 @@ interface Props {
   disabled?: boolean;
   thinkingEnabled: boolean;
   onThinkingEnabledChange: (enabled: boolean) => void;
+  models: ModelOption[];
+  selectedModel: string;
+  onSelectedModelChange: (model: string) => void;
+  modelsLoading: boolean;
 }
 
 export function Composer(props: Props) {
@@ -75,7 +80,7 @@ export function Composer(props: Props) {
           {loading ? <Square className="h-4 w-4 fill-current" /> : <Send className="h-4 w-4" />}
         </button>
       </div>
-      <div className="mx-auto mt-3 flex max-w-4xl items-center px-1">
+      <div className="mx-auto mt-3 flex max-w-4xl flex-wrap items-center gap-2 px-1">
         <button
           type="button"
           role="switch"
@@ -93,6 +98,27 @@ export function Composer(props: Props) {
           <Brain className="h-3.5 w-3.5" />
           深度思考 {props.thinkingEnabled ? "开" : "关"}
         </button>
+        <label className="flex min-w-0 items-center gap-2 rounded-full border border-[#424242] bg-[#2f2f2f] px-3.5 py-1.5 text-[13px] font-medium leading-5 text-[#a0a0a0] transition focus-within:border-[#5a5a5a]">
+          <Cpu className="h-3.5 w-3.5 shrink-0 text-brand-300" />
+          <span className="sr-only">选择模型</span>
+          <select
+            value={props.selectedModel}
+            disabled={loading || disabled || props.modelsLoading}
+            onChange={(event) => props.onSelectedModelChange(event.target.value)}
+            className="min-w-0 max-w-[15rem] bg-transparent text-[#d1d1d1] outline-none disabled:opacity-50"
+            title="选择本轮及后续对话使用的模型"
+          >
+            {props.modelsLoading && <option value="">正在读取模型…</option>}
+            {!props.modelsLoading && props.models.length === 0 && (
+              <option value="">服务器默认模型</option>
+            )}
+            {props.models.map((model) => (
+              <option key={model.id} value={model.id} className="bg-[#2f2f2f] text-[#ececec]">
+                {model.displayName}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
     </div>
   );

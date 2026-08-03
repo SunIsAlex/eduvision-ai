@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
 import { runPipeline } from "./stream";
 import { deliverBrowserToolResult } from "./toolbridge";
+import { getModelCatalog, isAvailableModel } from "./model-catalog";
 import { resolveModel, type ChatRequest, type Env } from "./types";
 
 export const app = new Hono<{ Bindings: Env }>();
@@ -42,6 +43,11 @@ app.get("/api/config", (c) => {
   });
 });
 
+app.get("/api/models", (c) => {
+  c.header("Cache-Control", "no-store");
+  return c.json(getModelCatalog(c.env));
+});
+
 /**
  * POST /api/chat/stream — Server-Sent Events endpoint.
  * Events: thinking | reasoning | answer | tool_call | tool_result | done | error.
@@ -64,6 +70,9 @@ app.post("/api/chat/stream", async (c) => {
     if (bytes > MAX_IMAGE_BYTES) {
       return c.json({ error: "图片超过请求限制，请压缩后重试" }, 413);
     }
+  }
+  if (body.model && !isAvailableModel(body.model, c.env)) {
+    return c.json({ error: "所选模型当前不可用，请刷新模型列表后重试" }, 400);
   }
 
   return streamSSE(c, async (stream) => {

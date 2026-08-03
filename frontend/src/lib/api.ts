@@ -1,4 +1,4 @@
-import type { ApiMessage } from "./types";
+import type { ApiMessage, ModelOption } from "./types";
 import { runTool } from "./toolRunner";
 
 export interface StreamCallbacks {
@@ -34,6 +34,7 @@ export async function streamChat(
     question?: string;
     history: ApiMessage[];
     thinking?: boolean;
+    model?: string;
   },
   callbacks: StreamCallbacks,
   signal?: AbortSignal
@@ -93,6 +94,22 @@ export async function streamChat(
   } catch (err) {
     if ((err as Error).name !== "AbortError") throw err;
   }
+}
+
+export async function fetchModels(): Promise<{
+  models: ModelOption[];
+  defaultModel: string;
+}> {
+  const response = await fetch("/api/models", { cache: "no-store" });
+  if (!response.ok) throw new Error(`模型列表加载失败（${response.status}）`);
+  const body = (await response.json()) as {
+    models?: ModelOption[];
+    defaultModel?: string;
+  };
+  if (!Array.isArray(body.models) || typeof body.defaultModel !== "string") {
+    throw new Error("模型列表格式无效");
+  }
+  return { models: body.models, defaultModel: body.defaultModel };
 }
 
 async function handleFrame(

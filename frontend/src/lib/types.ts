@@ -30,6 +30,11 @@ export interface ThinkingStep {
   text: string;
 }
 
+export interface ModelOption {
+  id: string;
+  displayName: string;
+}
+
 export interface ToolResult {
   ok: boolean;
   output: string;

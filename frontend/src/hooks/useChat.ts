@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { streamChat } from "../lib/api";
+import { fetchModels, streamChat } from "../lib/api";
 import { loadMessages, removeSavedMessages, saveMessages } from "../lib/persist";
 import {
   createSessionId,
@@ -9,7 +9,7 @@ import {
   saveRemoteSession,
 } from "../lib/session";
 import { appendMarkdownDelta, uid } from "../lib/utils";
-import type { ChatMessage, ThinkingStep } from "../lib/types";
+import type { ChatMessage, ModelOption, ThinkingStep } from "../lib/types";
 
 export function useChat() {
   const [sessionId, setSessionId] = useState(getOrCreateSessionId);
@@ -18,6 +18,9 @@ export function useChat() {
   const [image, setImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [thinking, setThinking] = useState<ThinkingStep[]>([]);
+  const [models, setModels] = useState<ModelOption[]>([]);
+  const [selectedModel, setSelectedModel] = useState("");
+  const [modelsLoading, setModelsLoading] = useState(true);
   const [thinkingEnabled, setThinkingEnabled] = useState(() => {
     try {
       return window.localStorage.getItem("eduvision-thinking-enabled") === "true";
@@ -30,6 +33,23 @@ export function useChat() {
   const [contextBreak, setContextBreak] = useState(0);
   const [sessionReady, setSessionReady] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void fetchModels()
+      .then((catalog) => {
+        if (!active) return;
+        setModels(catalog.models);
+        setSelectedModel(catalog.defaultModel);
+      })
+      .catch((error) => console.warn("[models] load failed:", error))
+      .finally(() => {
+        if (active) setModelsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // URL 会话先用本地副本快速恢复，再用服务端快照校准，方便跨设备恢复和调试。
   useEffect(() => {
@@ -119,7 +139,14 @@ export function useChat() {
 
     try {
       await streamChat(
-        { requestId, image: image ?? undefined, question, history, thinking: thinkingEnabled },
+        {
+          requestId,
+          image: image ?? undefined,
+          question,
+          history,
+          thinking: thinkingEnabled,
+          model: selectedModel || undefined,
+        },
         {
           onDebug: (event, data) =>
             patch((m) => {
@@ -215,7 +242,7 @@ export function useChat() {
       setLoading(false);
       setThinking([]);
     }
-  }, [input, image, loading, messages, contextBreak, thinkingEnabled]);
+  }, [input, image, loading, messages, contextBreak, thinkingEnabled, selectedModel]);
 
   /** 结束当前上下文：断点设在现有对话末尾，下一道题不带前面的上下文。 */
   const endContext = useCallback(() => {
@@ -252,6 +279,10 @@ export function useChat() {
     thinking,
     thinkingEnabled,
     setThinkingEnabled,
+    models,
+    selectedModel,
+    setSelectedModel,
+    modelsLoading,
     contextEnded: contextBreak > 0,
     endContext,
     send,

@@ -48,7 +48,7 @@ export async function* runPipeline(
     return;
   }
 
-  const model = resolveModel(env.API_MODEL);
+  const model = request.model?.trim() || resolveModel(env.API_MODEL);
   yield thinking(
     request.thinking === true
       ? request.image
