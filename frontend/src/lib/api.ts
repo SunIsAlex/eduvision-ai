@@ -162,7 +162,7 @@ async function handleFrame(
             console.warn("[tool] result delivery failed:", res.status);
           }
         } catch (err) {
-          // Worker-side wait will time out and continue with an error result.
+          // The backend wait will time out and continue with an error result.
           console.warn("[tool] result delivery error:", (err as Error).message);
         }
         break;
@@ -189,7 +189,7 @@ async function handleFrame(
   return event;
 }
 
-/** Upload an image; returns a data URL (dev fallback) or /media/ URL (R2). */
+/** Upload an image and receive its compressed data URL. */
 export async function uploadImage(file: File): Promise<string> {
   const form = new FormData();
   form.append("file", file);

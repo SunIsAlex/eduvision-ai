@@ -7,8 +7,7 @@ import { resolveModel, type ChatRequest, type Env } from "./types";
 
 export const app = new Hono<{ Bindings: Env }>();
 
-// EdgeOne Node Functions accept at most 6 MB request/response bodies. Keep
-// room for base64 expansion, JSON framing, question text and recent history.
+// Keep room for base64 expansion, JSON framing, question text and history.
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 
 app.use(
@@ -29,7 +28,7 @@ app.get("/health", (c) =>
     models: {
       answer: resolveModel(c.env.API_MODEL),
     },
-    uploads: Boolean(c.env.MEDIA_BUCKET),
+    uploads: false,
     timestamp: new Date().toISOString(),
   })
 );
@@ -54,7 +53,7 @@ app.post("/api/chat/stream", async (c) => {
   if (image?.startsWith("data:")) {
     const bytes = (image.length * 3) / 4;
     if (bytes > MAX_IMAGE_BYTES) {
-      return c.json({ error: "图片超过 EdgeOne 请求限制，请压缩后重试" }, 413);
+      return c.json({ error: "图片超过请求限制，请压缩后重试" }, 413);
     }
   }
 
@@ -97,12 +96,7 @@ app.post("/api/tool/result", async (c) => {
 
   const output = String(body.output ?? "").slice(0, 20_000);
   const ok = body.ok !== false;
-  const delivered = await deliverBrowserToolResult(
-    requestId,
-    toolCallId,
-    { ok, output },
-    c.env.TOOL_RESULTS
-  );
+  const delivered = await deliverBrowserToolResult(requestId, toolCallId, { ok, output });
   if (!delivered) {
     return c.json({ error: "没有等待该工具结果的会话（可能已超时或位于其他实例）" }, 404);
   }
@@ -111,8 +105,8 @@ app.post("/api/tool/result", async (c) => {
 
 /**
  * POST /api/upload — stores a homework image.
- * With an R2 binding the image is persisted and a /media/<key> URL is
- * returned; without one the data URL is echoed back (dev fallback).
+ * Images are compressed in the browser and returned as data URLs. Session
+ * snapshots persist them on the VPS together with the conversation.
  */
 app.post("/api/upload", async (c) => {
   const body = (await c.req.parseBody()) as Record<string, unknown>;
@@ -125,48 +119,12 @@ app.post("/api/upload", async (c) => {
     return c.json({ error: "仅支持图片文件" }, 400);
   }
   if (file.size > MAX_IMAGE_BYTES) {
-    return c.json({ error: "图片超过 EdgeOne 请求限制" }, 413);
+    return c.json({ error: "图片超过请求限制" }, 413);
   }
 
-  const bucket = c.env.MEDIA_BUCKET;
-  if (!bucket) {
-    const buf = await file.arrayBuffer();
-    const base64 = btoa(
-      [...new Uint8Array(buf)].map((b) => String.fromCharCode(b)).join("")
-    );
-    return c.json({
-      url: `data:${file.type};base64,${base64}`,
-      mode: "data",
-    });
-  }
-
-  const key = `${crypto.randomUUID()}.${file.name.split(".").pop() ?? "jpg"}`;
-  await bucket.put(key, await file.arrayBuffer(), {
-    httpMetadata: { contentType: file.type },
-  });
-  const origin = new URL(c.req.url).origin;
-  return c.json({ url: `${origin}/media/${key}`, mode: "r2" });
-});
-
-/** GET /media/:key — serve previously uploaded images from R2. */
-app.get("/media/:key", async (c) => {
-  const bucket = c.env.MEDIA_BUCKET;
-  if (!bucket) return c.json({ error: "存储未配置" }, 404);
-  const object = await bucket.get(c.req.param("key"));
-  if (!object) return c.json({ error: "文件不存在" }, 404);
-  const headers = new Headers();
-  object.writeHttpMetadata(headers);
-  headers.set("Cache-Control", "public, max-age=31536000, immutable");
-  return new Response(object.body, { headers });
-});
-
-/**
- * Serve the SPA through Wrangler's static-assets binding. `run_worker_first`
- * keeps API routes in this Worker, so non-API requests must be forwarded here.
- */
-app.get("*", (c) => {
-  if (c.env.ASSETS) return c.env.ASSETS.fetch(c.req.raw);
-  return c.text(
-    "EduVision AI worker 运行正常（未配置静态资源）。前端界面由构建后的 frontend/dist 提供，请访问根路径；开发模式请访问 http://localhost:5173"
+  const buf = await file.arrayBuffer();
+  const base64 = btoa(
+    [...new Uint8Array(buf)].map((byte) => String.fromCharCode(byte)).join("")
   );
+  return c.json({ url: `data:${file.type};base64,${base64}`, mode: "data" });
 });

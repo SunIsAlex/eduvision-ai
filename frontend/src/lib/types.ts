@@ -44,7 +44,7 @@ export interface ToolActivity {
   output?: string;
 }
 
-/** Wire-format messages sent to the worker (image as URL/data URL). */
+/** Wire-format messages sent to the backend (image as URL/data URL). */
 export interface ApiMessage {
   role: Role;
   content: string;

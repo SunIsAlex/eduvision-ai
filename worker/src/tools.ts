@@ -5,10 +5,10 @@
  * user):
  *
  *  - calculator:  hardened mathjs (no eval/import, bounded work), loaded
- *                 lazily in the frontend so the Worker bundle stays tiny.
+ *                 lazily in the frontend so the initial bundle stays small.
  *  - javascript:  enumeration/counting code in a Web Worker sandbox (no DOM).
  *
- * The Worker only relays tool calls to the browser, waits for the result via
+ * The backend only relays tool calls to the browser, waits for the result via
  * /api/tool/result, feeds it back to the model and keeps streaming on the same
  * SSE connection.
  */
@@ -67,7 +67,7 @@ export const TOOL_DEFINITIONS = [
   },
 ] as const;
 
-/** Every current tool runs in the browser; the Worker never executes code. */
+/** Every current tool runs in the browser; the backend never executes code. */
 export const TOOL_EXECUTORS: Record<string, ToolExecutor> = {
   calculator: "browser",
   javascript: "browser",

@@ -298,7 +298,7 @@ export async function* streamAnswer(
         executor,
       };
 
-      const result = await awaitBrowserToolResult(requestId, call.id, env.TOOL_RESULTS);
+      const result = await awaitBrowserToolResult(requestId, call.id);
       if (!result.ok) toolExecutionFailed = true;
       console.log(`[tool_result] ${requestId} ${call.name} ok=${result.ok} output=${result.output.slice(0, 120)}`);
 

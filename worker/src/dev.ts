@@ -1,6 +1,6 @@
 /**
- * Portable local dev server for environments where wrangler/workerd is not
- * available (e.g. Android/Termux). Serves the exact same Hono app on :8787.
+ * Node.js development and production server. Serves the Hono API and the
+ * built React SPA from one process.
  *
  * Usage:  npm run dev:node --workspace worker
  */
@@ -152,8 +152,7 @@ async function loadDevEnv(): Promise<Env> {
 
 const port = Number(process.env.PORT ?? 8787);
 
-// Hono's fetch signature accepts bindings as the second argument, so the same
-// worker code runs unmodified outside Cloudflare.
+// Hono's fetch signature accepts runtime configuration as the second argument.
 serve({
   fetch: async (request) => {
     const url = new URL(request.url);
@@ -169,4 +168,4 @@ serve({
   port,
 });
 
-console.log(`[eduvision] worker dev server: http://localhost:${port}`);
+console.log(`[eduvision] Node server: http://localhost:${port}`);

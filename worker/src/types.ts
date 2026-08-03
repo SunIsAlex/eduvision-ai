@@ -1,5 +1,5 @@
 /**
- * Shared types for the EduVision worker.
+ * Shared types for the EduVision Node backend.
  */
 
 /** A chat message from the client. `image` is a data URL or media URL. */
@@ -20,22 +20,12 @@ export interface ChatRequest {
   requestId?: string;
 }
 
-/** Environment bindings declared in wrangler.toml. */
+/** Runtime configuration loaded from .dev.vars or process environment. */
 export interface Env {
   API_KEY: string;
   API_URL?: string;
   /** Override the text reasoning/answering model (see MODELS). */
   API_MODEL?: string;
-  /** EdgeOne Makers KV binding used to bridge browser tool results across isolates. */
-  TOOL_RESULTS?: {
-    get(key: string): Promise<string | null>;
-    put(key: string, value: string): Promise<void>;
-    delete(key: string): Promise<void>;
-  };
-  /** R2 bucket for uploaded images (optional). */
-  MEDIA_BUCKET?: R2Bucket;
-  /** Static assets binding provided by wrangler when assets are configured. */
-  ASSETS?: Fetcher;
 }
 
 /**

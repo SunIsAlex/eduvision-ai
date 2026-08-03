@@ -2,7 +2,7 @@
  * Browser-side tool execution. Both current tools run locally in the user's
  * browser — calculator uses a lazily-loaded hardened mathjs, javascript runs
  * in a Web Worker (no DOM/page access). The result is POSTed back to the
- * Worker, which feeds it to the model and keeps streaming. 风险自负.
+ * backend, which feeds it to the model and keeps streaming. 风险自负.
  */
 import type { ToolResult } from "./types";
 

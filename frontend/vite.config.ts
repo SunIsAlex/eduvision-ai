@@ -5,13 +5,9 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
-    // Forward API calls to the local Cloudflare Worker in dev.
+    // Forward API calls to the local Node backend in dev.
     proxy: {
       "/api": {
-        target: "http://localhost:8787",
-        changeOrigin: true,
-      },
-      "/media": {
         target: "http://localhost:8787",
         changeOrigin: true,
       },
