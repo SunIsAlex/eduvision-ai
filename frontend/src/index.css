@@ -83,3 +83,17 @@ body {
 .tool-expression .markdown-body p {
   @apply m-0;
 }
+
+/* Thinking summaries use the same Markdown/KaTeX pipeline as final answers,
+   with a quieter palette appropriate for the collapsible reasoning card. */
+.reasoning-markdown .markdown-body {
+  color: #b4b4b4;
+  font-size: 0.875rem;
+  line-height: 1.5rem;
+}
+.reasoning-markdown .markdown-body p:first-child {
+  margin-top: 0;
+}
+.reasoning-markdown .markdown-body p:last-child {
+  margin-bottom: 0;
+}

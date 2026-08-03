@@ -209,9 +209,9 @@ export function ChatMessage({ message, thinking, showDebug = false }: Props) {
             </summary>
             <div
               ref={reasoningRef}
-              className="scrollbar-thin max-h-56 overflow-y-auto whitespace-pre-wrap border-t border-[#3d3d3d] px-4 py-3 text-sm leading-6 text-[#b4b4b4]"
+              className="reasoning-markdown scrollbar-thin max-h-56 overflow-y-auto border-t border-[#3d3d3d] px-4 py-3 text-sm leading-6 text-[#b4b4b4]"
             >
-              {message.reasoning}
+              <Markdown content={message.reasoning} />
               {message.status === "streaming" && (
                 <span className="ml-0.5 inline-block h-3 w-1 animate-pulse rounded-sm bg-emerald-400 align-middle" />
               )}
