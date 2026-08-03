@@ -68,6 +68,7 @@ export async function createOpenAIStream(
 ): Promise<AsyncIterable<RawMessageStreamEvent>> {
   const baseURL = (env.API_URL ?? DEFAULT_BASE_URL).replace(/\/$/, "");
   const summarizedThinking = Boolean(params.thinking);
+  const supportsReasoningEffort = /^(?:gpt-|o\d|codex)/i.test(params.model);
   const system = String(params.system ?? "") + (summarizedThinking
     ? "\n\n当前已开启思考摘要。你必须严格按以下顺序输出：先输出 <reasoning_summary>，接着用 1～3 句写给学生看的简短思路摘要，再输出 </reasoning_summary>，最后输出正常答案。摘要只写关键方法和检查点，不写内部自我对话，不重复完整解答。标签必须原样输出且不得放入 Markdown 代码块。"
     : "");
@@ -84,7 +85,9 @@ export async function createOpenAIStream(
       function: { name: tool.name, description: tool.description, parameters: tool.input_schema },
     })),
     ...(params.temperature !== undefined ? { temperature: params.temperature } : {}),
-    ...(summarizedThinking ? { reasoning_effort: "low" } : {}),
+    ...(supportsReasoningEffort
+      ? { reasoning_effort: summarizedThinking ? "low" : "none" }
+      : {}),
     ...(params.tool_choice && (params.tool_choice as Record<string, unknown>).type === "tool"
       ? {
           tool_choice: {
