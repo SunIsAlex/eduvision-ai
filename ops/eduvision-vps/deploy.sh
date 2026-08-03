@@ -21,7 +21,7 @@ install -o root -g root -m 644 ops/eduvision-vps/eduvision-ai.service /etc/syste
 systemctl daemon-reload
 systemctl restart eduvision-ai.service
 
-for attempt in 1 2 3 4 5; do
+for attempt in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
   if curl --silent --fail http://127.0.0.1:8791/health >/dev/null; then
     git rev-parse HEAD
     exit 0
