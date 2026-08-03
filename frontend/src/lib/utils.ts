@@ -84,6 +84,11 @@ export function normalizeLatexDelimiters(content: string): string {
   return output;
 }
 
+/** Repair adjacent GPT-generated bold labels without changing Claude output. */
+export function normalizeGptReasoningMarkdown(content: string): string {
+  return content.replace(/\*\*\s*\*\*/g, "**\n\n**");
+}
+
 /** Append one streamed answer delta without creating a `$$$$` boundary. */
 export function appendMarkdownDelta(content: string, delta: string): string {
   const separator = /\$\$\s*$/.test(content) && /^\s*\$\$/.test(delta) ? "\n\n" : "";

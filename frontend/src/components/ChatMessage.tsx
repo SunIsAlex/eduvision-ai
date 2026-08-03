@@ -3,7 +3,7 @@ import { Bot, Brain, Calculator, Check, Code, Copy, LineChart, Loader2, Triangle
 import { Markdown } from "./Markdown";
 import { FunctionPlot } from "./FunctionPlot";
 import type { ChatMessage as Message, ThinkingStep } from "../lib/types";
-import { cn } from "../lib/utils";
+import { cn, normalizeGptReasoningMarkdown } from "../lib/utils";
 
 interface Props {
   message: Message;
@@ -84,6 +84,10 @@ function CalculatorExpression({ raw }: { raw: string }) {
 
 export function ChatMessage({ message, thinking, showDebug = false }: Props) {
   const isUser = message.role === "user";
+  const isGptReasoning = /(?:^|\/)(?:gpt-|codex)/i.test(message.model ?? "");
+  const reasoningContent = isGptReasoning
+    ? normalizeGptReasoningMarkdown(message.reasoning ?? "")
+    : message.reasoning ?? "";
   const reasoningRef = useRef<HTMLDivElement>(null);
   const [waitingSeconds, setWaitingSeconds] = useState(0);
 
@@ -195,9 +199,17 @@ export function ChatMessage({ message, thinking, showDebug = false }: Props) {
         {message.reasoning && (
           <details
             open={message.status === "streaming"}
-            className="mb-3 overflow-hidden rounded-xl border border-[#3d3d3d] bg-[#282828]"
+            className={cn(
+              "mb-3 overflow-hidden border",
+              isGptReasoning
+                ? "rounded-2xl border-[#444] bg-[#2a2a2a] shadow-sm shadow-black/10"
+                : "rounded-xl border-[#3d3d3d] bg-[#282828]"
+            )}
           >
-            <summary className="flex cursor-pointer select-none items-center gap-2 px-3 py-2 text-xs text-slate-400 transition hover:text-slate-200">
+            <summary className={cn(
+              "flex cursor-pointer select-none items-center gap-2 text-xs text-slate-400 transition hover:text-slate-200",
+              isGptReasoning ? "px-4 py-3" : "px-3 py-2"
+            )}>
               <Brain className="h-3.5 w-3.5" />
               思考摘要
               {message.status === "streaming" && (
@@ -209,9 +221,14 @@ export function ChatMessage({ message, thinking, showDebug = false }: Props) {
             </summary>
             <div
               ref={reasoningRef}
-              className="reasoning-markdown scrollbar-thin max-h-56 overflow-y-auto border-t border-[#3d3d3d] px-4 py-3 text-sm leading-6 text-[#b4b4b4]"
+              className={cn(
+                "reasoning-markdown scrollbar-thin max-h-56 overflow-y-auto px-4 py-3 text-sm leading-6 text-[#b4b4b4]",
+                isGptReasoning
+                  ? "mx-3 mb-3 rounded-xl border border-[#3a3a3a] bg-[#222]"
+                  : "border-t border-[#3d3d3d]"
+              )}
             >
-              <Markdown content={message.reasoning} />
+              <Markdown content={reasoningContent} />
               {message.status === "streaming" && (
                 <span className="ml-0.5 inline-block h-3 w-1 animate-pulse rounded-sm bg-emerald-400 align-middle" />
               )}
