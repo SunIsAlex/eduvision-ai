@@ -1,8 +1,0 @@
-{
-  "extends": "../worker/tsconfig.json",
-  "compilerOptions": {
-    "noEmit": true,
-    "types": ["@cloudflare/workers-types"]
-  },
-  "include": ["./**/*.ts", "../worker/src/**/*.ts"]
-}

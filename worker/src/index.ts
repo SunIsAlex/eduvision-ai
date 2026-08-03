@@ -7,9 +7,9 @@ import { resolveModel, type ChatRequest, type Env } from "./types";
 
 const app = new Hono<{ Bindings: Env }>();
 
-// EdgeOne Edge Functions accept at most 1 MB request bodies. Keep enough room
-// for base64 expansion, JSON framing, question text and recent history.
-const MAX_IMAGE_BYTES = 700 * 1024;
+// EdgeOne Node Functions accept at most 6 MB request/response bodies. Keep
+// room for base64 expansion, JSON framing, question text and recent history.
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 
 app.use(
   "*",

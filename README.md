@@ -99,18 +99,19 @@ Secrets** 中把 `API_KEY` 添加为 **Secret**。`wrangler.toml` 已启用
 - 健康检查：`GET /health`
 - R2 媒体上传为可选配置（见 wrangler.toml 注释）。
 
-### 腾讯 EdgeOne Makers（本分支）
+### 腾讯 EdgeOne Makers Node Functions（本分支）
 
 在 EdgeOne Makers 中导入仓库并设置：
 
 - 构建命令：`npm run build`
 - 输出目录：`frontend/dist`
 - 环境变量：`API_URL`、`API_KEY`、`API_MODEL`
-- KV：创建并绑定 namespace，变量名设为 `TOOL_RESULTS`（跨边缘实例传递浏览器工具结果）
+- Node Function Maximum Duration：`120s`（默认 30s 不足以覆盖复杂题和工具回合）
 
-`edge-functions/[[default]].ts` 会把文件路由请求交给同一套 Hono API；静态资源由
-EdgeOne Pages 直接提供。由于 Edge Functions 请求体上限为 1 MB，前端会把图片压缩到
-约 600 KB，服务端再保留 700 KB 的图片硬限制。
+`cloud-functions/api/[[default]].ts` 使用 Makers Node.js 20 Cloud Function 承载
+`/api/*`，把请求交给同一套 Hono API；静态资源由 EdgeOne Pages 直接提供。Node
+Functions 支持长时间 AI 请求和 npm 生态，最大执行时间可配置为 120 秒。前端会把图片
+压缩到约 3 MB，服务端保留 4 MB 硬限制，为平台 6 MB 请求体上限预留 base64 和 JSON 空间。
 
 ## API
 

@@ -15,7 +15,7 @@
     "dev:worker:cf": "npm run dev --workspace worker",
     "dev:frontend": "npm run dev --workspace frontend",
     "build": "npm run typecheck && npm run build --workspace frontend",
-    "typecheck": "npm run typecheck --workspace worker && npm run typecheck --workspace frontend && tsc --noEmit -p edge-functions/tsconfig.json",
+    "typecheck": "npm run typecheck --workspace worker && npm run typecheck --workspace frontend && tsc --noEmit -p cloud-functions/tsconfig.json",
     "test:tools": "tsx worker/scripts/tools-e2e.ts",
     "deploy": "npm run build --workspace frontend && npm run deploy --workspace worker",
     "seed": "npm run seed --workspace worker"
