@@ -1,11 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { streamChat } from "../lib/api";
 import { loadMessages, removeSavedMessages, saveMessages } from "../lib/persist";
+import {
+  createSessionId,
+  getOrCreateSessionId,
+  loadRemoteSession,
+  replaceSessionUrl,
+  saveRemoteSession,
+} from "../lib/session";
 import { uid } from "../lib/utils";
 import type { ChatMessage, ThinkingStep } from "../lib/types";
 
 export function useChat() {
-  const [messages, setMessages] = useState<ChatMessage[]>(loadMessages);
+  const [sessionId, setSessionId] = useState(getOrCreateSessionId);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => loadMessages(sessionId));
   const [input, setInput] = useState("");
   const [image, setImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -20,16 +28,43 @@ export function useChat() {
   // 上下文断点是 messages 数组下标。点击“结束上下文”后，下一次请求
   // 只发送断点之后的完整 user/assistant 对话（包括历史图片）。
   const [contextBreak, setContextBreak] = useState(0);
+  const [sessionReady, setSessionReady] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
-  // 持久化：只在没有消息正在流式输出时写入，避免存下半截回答；
-  // 刷新页面后从 localStorage 恢复完整会话。
+  // URL 会话先用本地副本快速恢复，再用服务端快照校准，方便跨设备恢复和调试。
   useEffect(() => {
+    let active = true;
+    setSessionReady(false);
+    setMessages(loadMessages(sessionId));
+    setContextBreak(0);
+    void loadRemoteSession(sessionId)
+      .then((snapshot) => {
+        if (!active || !snapshot) return;
+        setMessages(snapshot.messages);
+        setContextBreak(Math.min(snapshot.contextBreak, snapshot.messages.length));
+        saveMessages(sessionId, snapshot.messages);
+      })
+      .catch((error) => console.warn("[session] restore failed:", error))
+      .finally(() => {
+        if (active) setSessionReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [sessionId]);
+
+  // 只保存完整回合，避免 URL 恢复出半截回答。
+  useEffect(() => {
+    if (!sessionReady) return;
     const streaming = messages.some(
       (m) => m.role === "assistant" && m.status === "streaming"
     );
-    if (!streaming) saveMessages(messages);
-  }, [messages]);
+    if (streaming) return;
+    saveMessages(sessionId, messages);
+    void saveRemoteSession(sessionId, { messages, contextBreak }).catch((error) =>
+      console.warn("[session] save failed:", error)
+    );
+  }, [messages, contextBreak, sessionId, sessionReady]);
 
   useEffect(() => {
     try {
@@ -194,17 +229,21 @@ export function useChat() {
 
   const reset = useCallback(() => {
     stop();
+    removeSavedMessages(sessionId);
+    const nextSessionId = createSessionId();
+    replaceSessionUrl(nextSessionId);
+    setSessionId(nextSessionId);
     setMessages([]);
     setInput("");
     setImage(null);
     setThinking([]);
     setLoading(false);
     setContextBreak(0);
-    removeSavedMessages();
-  }, [stop]);
+  }, [sessionId, stop]);
 
   return {
     messages,
+    sessionId,
     input,
     setInput,
     image,
