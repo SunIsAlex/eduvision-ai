@@ -59,64 +59,64 @@ export default function App() {
               <p className="text-xs leading-5 text-[#8e8e8e]">拍照搜题 · 多模态智能解题</p>
             </div>
           </div>
-          <div className="scrollbar-thin -mx-1 flex items-center gap-2 overflow-x-auto px-1 pb-0.5 lg:mx-0 lg:overflow-visible lg:px-0 lg:pb-0">
+          <div className="scrollbar-thin -mx-1 flex w-full items-center gap-2 overflow-x-auto px-1 pb-0.5 lg:mx-0 lg:w-auto lg:min-w-0 lg:flex-1 lg:overflow-visible lg:px-0 lg:pb-0">
+            {chat.messages.length > 0 && (
+              <>
+                <button
+                  type="button"
+                  onClick={chat.endContext}
+                  disabled={chat.contextEnded}
+                  title="点击后，下一道题不会带上之前对话的上下文"
+                  className={
+                    chat.contextEnded
+                      ? `${toolbarButton} border-brand-500/50 bg-brand-500/10 text-brand-300`
+                      : toolbarButton
+                  }
+                >
+                  {chat.contextEnded ? "已断开上下文" : "结束上下文"}
+                </button>
+                <button type="button" onClick={chat.reset} className={toolbarButton}>
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  新对话
+                </button>
+              </>
+            )}
+            <div className="ml-auto flex shrink-0 items-center gap-2 pl-3">
               <button
                 type="button"
                 onClick={() => setDebug((value) => !value)}
                 title="显示服务端流式事件、工具参数和模型响应"
+                aria-label="调试"
                 aria-pressed={debug}
                 className={
                   debug
-                    ? `${toolbarButton} border-amber-500/60 bg-amber-500/10 text-amber-300`
-                    : toolbarButton
+                    ? "flex h-10 w-10 items-center justify-center rounded-xl border border-amber-500/60 bg-amber-500/10 text-amber-300 transition"
+                    : "flex h-10 w-10 items-center justify-center rounded-xl border border-[#424242] bg-[#242424] text-[#b4b4b4] transition hover:border-[#5a5a5a] hover:bg-[#2f2f2f] hover:text-[#ececec]"
                 }
               >
-                <Bug className="h-3.5 w-3.5" />
-                调试
+                <Bug className="h-4 w-4" />
               </button>
-            {chat.messages.length > 0 && (
-              <>
-              <button
-                type="button"
-                onClick={() => {
-                  void navigator.clipboard.writeText(window.location.href).then(() => {
-                    setLinkCopied(true);
-                    window.setTimeout(() => setLinkCopied(false), 1500);
-                  });
-                }}
-                title="复制可恢复和调试当前会话的链接"
-                className={toolbarButton}
-              >
-                {linkCopied ? (
-                  <Check className="h-3.5 w-3.5 text-emerald-400" />
-                ) : (
-                  <Link2 className="h-3.5 w-3.5" />
-                )}
-                {linkCopied ? "已复制" : "会话链接"}
-              </button>
-              <button
-                type="button"
-                onClick={chat.endContext}
-                disabled={chat.contextEnded}
-                title="点击后，下一道题不会带上之前对话的上下文"
-                className={
-                  chat.contextEnded
-                    ? `${toolbarButton} border-brand-500/50 bg-brand-500/10 text-brand-300`
-                    : toolbarButton
-                }
-              >
-                {chat.contextEnded ? "已断开上下文" : "结束上下文"}
-              </button>
-              <button
-                type="button"
-                onClick={chat.reset}
-                className={toolbarButton}
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-                新对话
-              </button>
-              </>
-            )}
+              {chat.messages.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(window.location.href).then(() => {
+                      setLinkCopied(true);
+                      window.setTimeout(() => setLinkCopied(false), 1500);
+                    });
+                  }}
+                  title={linkCopied ? "会话链接已复制" : "复制可恢复和调试当前会话的链接"}
+                  aria-label={linkCopied ? "会话链接已复制" : "复制会话链接"}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#424242] bg-[#242424] text-[#b4b4b4] transition hover:border-[#5a5a5a] hover:bg-[#2f2f2f] hover:text-[#ececec]"
+                >
+                  {linkCopied ? (
+                    <Check className="h-4 w-4 text-emerald-400" />
+                  ) : (
+                    <Link2 className="h-4 w-4" />
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </header>
