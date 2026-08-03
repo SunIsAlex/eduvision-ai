@@ -148,7 +148,7 @@ export function ChatMessage({ message, thinking, showDebug = false }: Props) {
           <div className="mb-3 rounded-xl border border-brand-500/20 bg-[#282828] px-4 py-3">
             <p className="flex items-center gap-2 text-[13px] text-slate-300">
               <Brain className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
-              <span className="font-medium">Claude 正在思考</span>
+              <span className="font-medium">模型正在思考</span>
               <span className="ml-auto tabular-nums text-[11px] text-slate-500">
                 {waitingSeconds}s
               </span>

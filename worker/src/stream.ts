@@ -52,11 +52,11 @@ export async function* runPipeline(
   yield thinking(
     request.thinking === true
       ? request.image
-        ? "Claude 正在阅读图片并深度思考…"
-        : "Claude 正在深度思考…"
+        ? "模型正在阅读图片并深度思考…"
+        : "模型正在深度思考…"
       : request.image
-        ? "Claude 正在阅读图片并分析题目…"
-        : "Claude 正在分析题目…"
+        ? "模型正在阅读图片并分析题目…"
+        : "模型正在分析题目…"
   );
 
   let emittedContent = false;

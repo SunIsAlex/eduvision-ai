@@ -93,7 +93,7 @@ export function Composer(props: Props) {
               ? "border-brand-500/70 bg-brand-500/15 text-brand-300"
               : "border-[#424242] bg-[#2f2f2f] text-[#a0a0a0] hover:bg-[#363636] hover:text-[#ececec]"
           )}
-          title="开启后 Claude 会花更多时间推理，并显示思考过程"
+          title="开启后模型会花更多时间推理，并在可用时显示思考摘要"
         >
           <Brain className="h-3.5 w-3.5" />
           深度思考 {props.thinkingEnabled ? "开" : "关"}

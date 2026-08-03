@@ -14,7 +14,7 @@ export interface ChatRequest {
   image?: string;
   question?: string;
   history?: ChatMessage[];
-  /** User-controlled Claude extended-thinking mode. */
+  /** User-controlled provider reasoning mode. */
   thinking?: boolean;
   /** Client-generated id used to correlate browser tool results back to this stream. */
   requestId?: string;
