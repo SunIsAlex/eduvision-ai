@@ -6,8 +6,6 @@ export interface ChatMessage {
   content: string;
   /** Provider-generated summarized thinking shown live (assistant only). */
   reasoning?: string;
-  /** Markdown transcription streamed from the image OCR model. */
-  ocr?: string;
   /** Tool calls made while producing this answer (assistant only). */
   tools?: ToolActivity[];
   image?: string;
@@ -15,7 +13,11 @@ export interface ChatMessage {
   pipeline?: string;
   model?: string;
   error?: boolean;
-  status?: "streaming" | "done" | "error";
+  /** 消息内容曾被用户编辑过（Telegram 风格“已编辑”标记）。 */
+  edited?: boolean;
+  /** 编辑历史：每次编辑前的内容，用于渲染 git diff 风格对比。 */
+  edits?: MessageEdit[];
+  status?: "streaming" | "done" | "error" | "stopped";
   /** Raw SSE event timeline, only rendered when the debug panel is enabled. */
   debugEvents?: DebugEvent[];
 }
@@ -23,6 +25,12 @@ export interface ChatMessage {
 export interface DebugEvent {
   event: string;
   data: Record<string, unknown>;
+  at: string;
+}
+
+/** 一次编辑记录：previous 为该次编辑前的完整内容。 */
+export interface MessageEdit {
+  previous: string;
   at: string;
 }
 

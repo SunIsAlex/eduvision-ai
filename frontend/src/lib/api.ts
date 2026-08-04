@@ -3,7 +3,6 @@ import { runTool } from "./toolRunner";
 
 export interface StreamCallbacks {
   onDebug?: (event: string, data: Record<string, unknown>) => void;
-  onOcr: (delta: string) => void;
   onThinking: (text: string) => void;
   onReasoning: (delta: string) => void;
   onAnswer: (delta: string) => void;
@@ -93,7 +92,8 @@ export async function streamChat(
       await handleFrame(buffer, callbacks, { requestId: request.requestId, signal });
     }
   } catch (err) {
-    if ((err as Error).name !== "AbortError") throw err;
+    // 不再吞掉 AbortError：调用方需要知道流被中止，以便把消息标记为“已停止”。
+    throw err;
   }
 }
 
@@ -167,9 +167,6 @@ async function handleFrame(
       case "answer":
         if (parsed.text) cb.onAnswer(parsed.text);
         break;
-      case "ocr":
-        if (parsed.text) cb.onOcr(parsed.text);
-        break;
       case "reasoning":
         if (parsed.text) cb.onReasoning(parsed.text);
         break;
@@ -240,12 +237,3 @@ async function executeAndDeliverBrowserTool(
   }
 }
 
-/** Upload an image and receive its compressed data URL. */
-export async function uploadImage(file: File): Promise<string> {
-  const form = new FormData();
-  form.append("file", file);
-  const res = await fetch("/api/upload", { method: "POST", body: form });
-  if (!res.ok) throw new Error(`上传失败（${res.status}）`);
-  const data = (await res.json()) as { url: string };
-  return data.url;
-}

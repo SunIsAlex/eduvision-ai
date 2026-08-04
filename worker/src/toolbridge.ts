@@ -12,6 +12,8 @@ import type { ToolResult } from "./tools";
 interface PendingTool {
   resolve: (result: ToolResult) => void;
   timer: ReturnType<typeof setTimeout>;
+  /** Abort wiring so a stopped request releases its pending wait immediately. */
+  abort?: { signal: AbortSignal; listener: () => void };
 }
 
 const pending = new Map<string, PendingTool>();
@@ -23,14 +25,33 @@ function key(requestId: string, toolCallId: string): string {
 
 export function awaitBrowserToolResult(
   requestId: string,
-  toolCallId: string
+  toolCallId: string,
+  signal?: AbortSignal
 ): Promise<ToolResult> {
+  const entryKey = key(requestId, toolCallId);
   return new Promise<ToolResult>((resolve) => {
+    const onAbort = () => {
+      const p = pending.get(entryKey);
+      if (!p) return;
+      clearTimeout(p.timer);
+      signal?.removeEventListener("abort", onAbort);
+      pending.delete(entryKey);
+      resolve({ ok: false, output: "请求已取消。" });
+    };
     const timer = setTimeout(() => {
-      pending.delete(key(requestId, toolCallId));
+      const p = pending.get(entryKey);
+      if (!p) return;
+      if (p.abort) p.abort.signal.removeEventListener("abort", p.abort.listener);
+      pending.delete(entryKey);
       resolve({ ok: false, output: "浏览器端工具执行超时，未能返回结果。" });
     }, WAIT_TIMEOUT_MS);
-    pending.set(key(requestId, toolCallId), { resolve, timer });
+    pending.set(entryKey, {
+      resolve,
+      timer,
+      abort: signal ? { signal, listener: onAbort } : undefined,
+    });
+    if (signal?.aborted) onAbort();
+    else signal?.addEventListener("abort", onAbort, { once: true });
   });
 }
 
@@ -43,7 +64,20 @@ export async function deliverBrowserToolResult(
   const p = pending.get(key(requestId, toolCallId));
   if (!p) return false;
   clearTimeout(p.timer);
+  if (p.abort) p.abort.signal.removeEventListener("abort", p.abort.listener);
   pending.delete(key(requestId, toolCallId));
   p.resolve(result);
   return true;
+}
+
+/** Resolve every pending wait belonging to a request (e.g. the client aborted). */
+export function cancelBrowserToolWaits(requestId: string): void {
+  const prefix = key(requestId, "");
+  for (const [entryKey, p] of [...pending]) {
+    if (!entryKey.startsWith(prefix)) continue;
+    clearTimeout(p.timer);
+    if (p.abort) p.abort.signal.removeEventListener("abort", p.abort.listener);
+    pending.delete(entryKey);
+    p.resolve({ ok: false, output: "请求已取消。" });
+  }
 }

@@ -201,7 +201,8 @@ export async function* streamAnswer(
     requestId?: string;
     thinking?: boolean;
     skill?: SkillId;
-  }
+  },
+  signal?: AbortSignal
 ): AsyncGenerator<StreamDelta, void, unknown> {
   const model = input.model ?? MODELS.VISION;
   const requestId = input.requestId ?? "local";
@@ -242,7 +243,7 @@ export async function* streamAnswer(
     // supported grammar after showing the real failed tool attempt.
   }
 
-  const client = createClient(env);
+  const client = createClient(env, signal);
   const messages = toAnthropicMessages(
     buildMessages({ question: input.question, image: input.image, history: input.history })
   );
@@ -258,6 +259,7 @@ export async function* streamAnswer(
   );
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    if (signal?.aborted) return;
     const requiredTool = javascriptRequired && !usedTools.has("javascript")
       ? "javascript"
       : calculatorRequired && !usedTools.has("calculator")
@@ -384,7 +386,7 @@ export async function* streamAnswer(
       const resultPromise =
         executor === "server"
           ? executeServerTool(call.name, call.args)
-          : awaitBrowserToolResult(requestId, call.id);
+          : awaitBrowserToolResult(requestId, call.id, signal);
       return { call, executor, resultPromise };
     });
 

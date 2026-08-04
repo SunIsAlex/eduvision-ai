@@ -65,7 +65,8 @@ function toOpenAIMessages(messages: MessageParam[]): OpenAIMessage[] {
 /** OpenAI-compatible streaming adapter which emits the internal Anthropic-shaped events. */
 export async function createOpenAIStream(
   env: Env,
-  params: MessageCreateParamsStreaming
+  params: MessageCreateParamsStreaming,
+  signal?: AbortSignal
 ): Promise<AsyncIterable<RawMessageStreamEvent>> {
   const baseURL = (env.API_URL ?? DEFAULT_BASE_URL).replace(/\/$/, "");
   const summarizedThinking = Boolean(params.thinking);
@@ -100,14 +101,19 @@ export async function createOpenAIStream(
         }
       : {}),
   };
-  const { response, release } = await queuedPooledFetch(env, `${baseURL}/v1/chat/completions`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${env.API_KEY}`,
+  const { response, release } = await queuedPooledFetch(
+    env,
+    `${baseURL}/v1/chat/completions`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${env.API_KEY}`,
+      },
+      body: JSON.stringify(body),
     },
-    body: JSON.stringify(body),
-  });
+    signal
+  );
   if (!response.ok) {
     let detail = "";
     try {

@@ -12,23 +12,28 @@ export type MessageCreateParamsStreaming = Record<string, unknown> & {
 export type RawMessageStreamEvent = Record<string, any> & { type: string };
 
 /** Minimal fetch-based Anthropic client, compatible with pure V8 edge runtimes. */
-export function createClient(env: Env) {
+export function createClient(env: Env, signal?: AbortSignal) {
   const baseURL = (env.API_URL ?? DEFAULT_BASE_URL).replace(/\/$/, "");
   return {
     messages: {
       async create(params: MessageCreateParamsStreaming): Promise<AsyncIterable<RawMessageStreamEvent>> {
         if (!params.model.toLowerCase().startsWith("claude")) {
-          return createOpenAIStream(env, params);
+          return createOpenAIStream(env, params, signal);
         }
-        const { response, release } = await queuedPooledFetch(env, `${baseURL}/v1/messages`, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "x-api-key": env.API_KEY,
-            "anthropic-version": "2023-06-01",
+        const { response, release } = await queuedPooledFetch(
+          env,
+          `${baseURL}/v1/messages`,
+          {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              "x-api-key": env.API_KEY,
+              "anthropic-version": "2023-06-01",
+            },
+            body: JSON.stringify(params),
           },
-          body: JSON.stringify(params),
-        });
+          signal
+        );
         if (!response.ok) {
           let detail = "";
           try {
@@ -106,7 +111,11 @@ export async function* streamRound(stream: AsyncIterable<RawMessageStreamEvent>)
         else if (delta.type === "input_json_delta") { emitted = true; toolJson.set(event.index, (toolJson.get(event.index) ?? "") + delta.partial_json); }
       } else if (event.type === "message_delta") finishReason = event.delta.stop_reason;
     }
-  } catch (err) { if (!emitted) throw err; console.warn("[stream] connection closed after partial response:", (err as Error).message); }
+  } catch (err) {
+    if ((err as Error).name === "AbortError") throw err;
+    if (!emitted) throw err;
+    console.warn("[stream] connection closed after partial response:", (err as Error).message);
+  }
 
   const assistantContent = [...blocks.entries()].sort(([a], [b]) => a - b).map(([index, block]) => {
     if (block.type === "text") return { ...block, text: content };

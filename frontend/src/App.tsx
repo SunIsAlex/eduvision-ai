@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type TouchEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 import { Bug, Check, ChevronDown, Link2, Loader2, LockKeyhole, PanelLeft, SquarePen } from "lucide-react";
 import { Composer } from "./components/Composer";
 import { ChatMessage } from "./components/ChatMessage";
@@ -165,6 +165,14 @@ function ChatApp() {
     if (stickToBottomRef.current) el.scrollTop = el.scrollHeight;
   }, [chat.messages, chat.thinking]);
 
+  // 最近一条用户提问的索引（用于显示“编辑”入口）。
+  const lastUserIndex = useMemo(() => {
+    for (let i = chat.messages.length - 1; i >= 0; i--) {
+      if (chat.messages[i]?.role === "user") return i;
+    }
+    return -1;
+  }, [chat.messages]);
+
   return (
     <div
       className="flex h-full flex-col bg-cream text-ink"
@@ -287,6 +295,11 @@ function ChatApp() {
                 key={m.id}
                 message={m}
                 showDebug={debug}
+                isLast={i === chat.messages.length - 1}
+                isLastUserMessage={m.role === "user" && i === lastUserIndex && !chat.loading}
+                onEdit={chat.editMessage}
+                onEditUser={chat.editUserMessage}
+                onResume={chat.resumeMessage}
                 thinking={
                   m.role === "assistant" &&
                   m.status === "streaming" &&

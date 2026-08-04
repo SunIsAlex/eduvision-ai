@@ -94,7 +94,6 @@ sudo /usr/local/sbin/openclaw-eduvision-root status
 
 - `POST /api/chat/stream`：SSE 对话流，可传 `skill=general|math|chemistry`。
 - `POST /api/tool/result`：浏览器回传工具结果。
-- `POST /api/upload`：压缩图片转为 data URL。
 - `POST /api/title`：用当前会话模型为会话生成简短标题。
 - `GET|PUT|DELETE /api/sessions/:uuid`：读取、保存或删除 URL 会话。
 - `GET /health`：服务状态。

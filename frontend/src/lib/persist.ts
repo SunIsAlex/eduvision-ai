@@ -18,15 +18,31 @@ function normalize(m: unknown): ChatMessage | null {
     role,
     content: typeof msg.content === "string" ? repairAdjacentDisplayMath(msg.content) : "",
     ...(typeof msg.reasoning === "string" ? { reasoning: msg.reasoning } : {}),
-    ...(typeof msg.ocr === "string" ? { ocr: msg.ocr } : {}),
     ...(Array.isArray(msg.tools) ? { tools: msg.tools } : {}),
     ...(typeof msg.image === "string" ? { image: msg.image } : {}),
     ...(typeof msg.pipeline === "string" ? { pipeline: msg.pipeline } : {}),
     ...(typeof msg.model === "string" ? { model: msg.model } : {}),
     ...(typeof msg.error === "boolean" ? { error: msg.error } : {}),
+    ...(typeof msg.edited === "boolean" ? { edited: msg.edited } : {}),
+    ...(Array.isArray(msg.edits)
+      ? {
+          edits: msg.edits.filter(
+            (entry) =>
+              Boolean(entry) &&
+              typeof (entry as { previous?: unknown }).previous === "string"
+          ),
+        }
+      : {}),
     ...(Array.isArray(msg.debugEvents) ? { debugEvents: msg.debugEvents } : {}),
     ...(role === "assistant"
-      ? { status: msg.status === "error" ? ("error" as const) : ("done" as const) }
+      ? {
+          status:
+            msg.status === "error"
+              ? ("error" as const)
+              : msg.status === "stopped"
+                ? ("stopped" as const)
+                : ("done" as const),
+        }
       : {}),
   };
 }

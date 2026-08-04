@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
 import { runPipeline } from "./stream";
-import { deliverBrowserToolResult } from "./toolbridge";
+import { cancelBrowserToolWaits, deliverBrowserToolResult } from "./toolbridge";
 import { getModelCatalog, isAvailableModel } from "./model-catalog";
 import { generateTitle } from "./title";
 import { isSkillId, resolveModel, type ChatRequest, type Env } from "./types";
@@ -211,9 +211,16 @@ app.post("/api/chat/stream", async (c) => {
   }
 
   return streamSSE(c, async (stream) => {
-    const gen = runPipeline(c.env, body);
+    // 客户端断开（点“停止”或直接关闭页面）时取消上游流，避免继续消耗
+    // token/额度；同时释放等待浏览器工具结果的挂起条目。
+    const controller = new AbortController();
+    const onAbort = () => controller.abort();
+    c.req.raw.signal.addEventListener("abort", onAbort);
+    stream.onAbort(onAbort);
+    const gen = runPipeline(c.env, body, { signal: controller.signal });
     try {
       for await (const evt of gen) {
+        if (controller.signal.aborted) break;
         await stream.writeSSE({
           event: evt.event,
           data: evt.data,
@@ -221,6 +228,9 @@ app.post("/api/chat/stream", async (c) => {
         if (evt.event === "done" || evt.event === "error") break;
       }
     } finally {
+      c.req.raw.signal.removeEventListener("abort", onAbort);
+      controller.abort();
+      cancelBrowserToolWaits(body.requestId ?? "local");
       await stream.close();
     }
   });
@@ -256,28 +266,3 @@ app.post("/api/tool/result", async (c) => {
   return c.json({ ok: true });
 });
 
-/**
- * POST /api/upload — stores a homework image.
- * Images are compressed in the browser and returned as data URLs. Session
- * snapshots persist them on the VPS together with the conversation.
- */
-app.post("/api/upload", async (c) => {
-  const body = (await c.req.parseBody()) as Record<string, unknown>;
-  const file = body["file"];
-
-  if (!(file instanceof File)) {
-    return c.json({ error: "缺少 file 字段" }, 400);
-  }
-  if (!file.type.startsWith("image/")) {
-    return c.json({ error: "仅支持图片文件" }, 400);
-  }
-  if (file.size > MAX_IMAGE_BYTES) {
-    return c.json({ error: "图片超过请求限制" }, 413);
-  }
-
-  const buf = await file.arrayBuffer();
-  const base64 = btoa(
-    [...new Uint8Array(buf)].map((byte) => String.fromCharCode(byte)).join("")
-  );
-  return c.json({ url: `data:${file.type};base64,${base64}`, mode: "data" });
-});

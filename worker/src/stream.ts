@@ -6,7 +6,6 @@ export interface StreamEvent {
   event:
     | "thinking"
     | "reasoning"
-    | "ocr"
     | "answer"
     | "tool_call"
     | "tool_result"
@@ -37,8 +36,10 @@ function done(model: string): StreamEvent {
  */
 export async function* runPipeline(
   env: Env,
-  request: ChatRequest
+  request: ChatRequest,
+  opts: { signal?: AbortSignal } = {}
 ): AsyncGenerator<StreamEvent, void, unknown> {
+  const { signal } = opts;
   if (!env.API_KEY) {
     yield error("服务端未配置 API_KEY，请联系管理员。");
     return;
@@ -61,17 +62,22 @@ export async function* runPipeline(
 
   let emittedContent = false;
   try {
-    const gen = streamAnswer(env, {
-      question: request.question ?? "",
-      image: request.image,
-      history: request.history,
-      model,
-      requestId: request.requestId,
-      thinking: request.thinking === true,
-      skill: request.skill ?? "general",
-    });
+    const gen = streamAnswer(
+      env,
+      {
+        question: request.question ?? "",
+        image: request.image,
+        history: request.history,
+        model,
+        requestId: request.requestId,
+        thinking: request.thinking === true,
+        skill: request.skill ?? "general",
+      },
+      signal
+    );
     try {
       for await (const delta of gen) {
+        if (signal?.aborted) return;
         if (delta.kind === "reasoning") {
           // Forward Anthropic summarized-thinking deltas live. These are not
           // the model's private/raw chain of thought.
@@ -114,6 +120,10 @@ export async function* runPipeline(
         }
       }
     } catch (err) {
+      if (signal?.aborted || (err as Error).name === "AbortError") {
+        console.log(`[stream] aborted: ${request.requestId ?? "local"}`);
+        return;
+      }
       // Defensive: if answer content was already streamed, surface it as a
       // successful completion instead of failing after the fact.
       if (emittedContent) {
@@ -129,6 +139,10 @@ export async function* runPipeline(
     }
     yield done(model);
   } catch (err) {
+    if (signal?.aborted || (err as Error).name === "AbortError") {
+      console.log(`[stream] aborted: ${request.requestId ?? "local"}`);
+      return;
+    }
     console.error("[stream] failed:", err);
     yield error("生成解答时出错，请稍后重试。");
   }

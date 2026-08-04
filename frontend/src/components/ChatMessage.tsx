@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Brain, Calculator, Check, Code, Copy, LineChart, Loader2, TriangleAlert } from "lucide-react";
+import { Brain, Calculator, Check, Code, Copy, LineChart, Loader2, Pencil, Play, Square, TriangleAlert } from "lucide-react";
 import { Markdown } from "./Markdown";
 import { FunctionPlot } from "./FunctionPlot";
+import { DiffView } from "./DiffView";
 import type { ChatMessage as Message, ThinkingStep } from "../lib/types";
 import { cn, normalizeGptReasoningMarkdown } from "../lib/utils";
 
@@ -9,6 +10,15 @@ interface Props {
   message: Message;
   thinking?: ThinkingStep[];
   showDebug?: boolean;
+  /** 最后一条消息：被暂停时还可以继续生成。 */
+  isLast?: boolean;
+  /** 最近一条用户提问可以编辑并重新生成。 */
+  isLastUserMessage?: boolean;
+  /** 编辑模型输出（本地修改，用于纠正笔误）。 */
+  onEdit?: (messageId: string, content: string) => void;
+  /** 编辑最近一条用户提问并重新生成。 */
+  onEditUser?: (messageId: string, content: string) => void;
+  onResume?: (messageId: string) => void;
 }
 
 const PIPELINE_LABELS: Record<string, string> = {
@@ -92,7 +102,57 @@ function CalculatorExpression({ raw }: { raw: string }) {
   );
 }
 
-export function ChatMessage({ message, thinking, showDebug = false }: Props) {
+/** 内联编辑器：Ctrl/⌘ + Enter 保存。 */
+function MessageEditor({
+  initial,
+  placeholder,
+  onSave,
+  onCancel,
+}: {
+  initial: string;
+  placeholder: string;
+  onSave: (content: string) => void;
+  onCancel: () => void;
+}) {
+  const [draft, setDraft] = useState(initial);
+
+  return (
+    <div className="mt-2 overflow-hidden rounded-xl border border-line bg-card">
+      <textarea
+        autoFocus
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+        onKeyDown={(event) => {
+          if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+            event.preventDefault();
+            onSave(draft);
+          }
+        }}
+        rows={6}
+        placeholder={placeholder}
+        className="w-full resize-y bg-transparent px-3 py-2 text-sm leading-6 text-ink outline-none placeholder:text-faint"
+      />
+      <div className="flex items-center justify-end gap-1.5 border-t border-line bg-white/60 px-2 py-1.5">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-lg px-2.5 py-1.5 text-xs font-medium text-mute transition hover:bg-black/5 hover:text-ink"
+        >
+          取消
+        </button>
+        <button
+          type="button"
+          onClick={() => onSave(draft)}
+          className="rounded-lg bg-brand-500 px-2.5 py-1.5 text-xs font-medium text-white transition hover:bg-brand-600"
+        >
+          保存
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function ChatMessage({ message, thinking, showDebug = false, isLast = false, isLastUserMessage = false, onEdit, onEditUser, onResume }: Props) {
   const isUser = message.role === "user";
   const isGptReasoning = /(?:^|\/)(?:gpt-|codex)/i.test(message.model ?? "");
   const reasoningContent = isGptReasoning
@@ -100,6 +160,9 @@ export function ChatMessage({ message, thinking, showDebug = false }: Props) {
     : message.reasoning ?? "";
   const reasoningRef = useRef<HTMLDivElement>(null);
   const [waitingSeconds, setWaitingSeconds] = useState(0);
+  const [editing, setEditing] = useState(false);
+  const [showDiff, setShowDiff] = useState(false);
+  const lastEdit = message.edits?.at(-1);
 
   useEffect(() => {
     if (message.status !== "streaming" || !thinking?.length) {
@@ -132,6 +195,45 @@ export function ChatMessage({ message, thinking, showDebug = false }: Props) {
               className="mt-2 max-h-64 rounded-xl border border-line object-contain"
             />
           )}
+          {message.edited && !editing && (
+            <div className="mt-1 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowDiff((value) => !value)}
+                title={showDiff ? "收起修改对比" : "查看修改对比"}
+                className="rounded px-1 text-[11px] leading-4 text-faint transition hover:text-mute hover:underline"
+              >
+                已编辑
+              </button>
+            </div>
+          )}
+          {showDiff && lastEdit && (
+            <DiffView previous={lastEdit.previous} current={message.content} />
+          )}
+          {/* 最近一条用户提问可编辑：保存后按新提问重新生成。 */}
+          {isLastUserMessage && !editing && (
+            <div className="mt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-mute transition hover:bg-black/5 hover:text-ink"
+              >
+                <Pencil className="h-3 w-3" />
+                编辑
+              </button>
+            </div>
+          )}
+          {editing && (
+            <MessageEditor
+              initial={message.content}
+              placeholder="修改这条提问…（Ctrl/⌘ + Enter 保存）"
+              onSave={(content) => {
+                onEditUser?.(message.id, content);
+                setEditing(false);
+              }}
+              onCancel={() => setEditing(false)}
+            />
+          )}
         </div>
       </div>
     );
@@ -162,37 +264,6 @@ export function ChatMessage({ message, thinking, showDebug = false }: Props) {
             {thinking[thinking.length - 1]?.text}
           </p>
         </div>
-      )}
-
-      {message.ocr && (
-        <details open className="mb-2 overflow-hidden rounded-xl border border-line bg-card">
-          <summary className="flex cursor-pointer select-none items-center gap-2 px-3 py-2 text-xs text-mute">
-            <Code className="h-3.5 w-3.5" />
-            题目转写
-            {message.status === "streaming" && !message.reasoning && !message.content && (
-              <span className="flex items-center gap-1 text-[11px] text-brand-600">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                识别中
-              </span>
-            )}
-            <button
-              type="button"
-              title="复制 Markdown 转写"
-              className="ml-auto flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-faint hover:bg-black/5 hover:text-ink"
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                void navigator.clipboard.writeText(message.ocr ?? "");
-              }}
-            >
-              <Copy className="h-3 w-3" />
-              复制 Markdown
-            </button>
-          </summary>
-          <div className="border-t border-line px-3 py-2 text-sm">
-            <Markdown content={message.ocr} />
-          </div>
-        </details>
       )}
 
       {/* Provider-generated summarized thinking, similar to the Claude app. */}
@@ -322,6 +393,11 @@ export function ChatMessage({ message, thinking, showDebug = false }: Props) {
           </p>
         ) : message.content ? (
           <Markdown content={message.content} />
+        ) : message.status === "stopped" ? (
+          <span className="inline-flex items-center gap-1.5 text-xs text-mute">
+            <Square className="h-3 w-3" />
+            已停止生成
+          </span>
         ) : (
           <span className="inline-flex items-center gap-1 text-faint">
             <span className="h-2 w-2 animate-bounce rounded-full bg-faint" />
@@ -334,7 +410,64 @@ export function ChatMessage({ message, thinking, showDebug = false }: Props) {
         {message.status === "streaming" && message.content && (
           <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse rounded-sm bg-brand-500 align-middle" />
         )}
+        {/* Stopped: keep the partial answer visible, but make the state explicit. */}
+        {message.status === "stopped" && message.content && (
+          <p className="mt-2 flex items-center gap-1.5 text-xs text-mute">
+            <Square className="h-3 w-3" />
+            已停止生成（以上为已生成的部分内容）
+          </p>
+        )}
+        {message.edited && !editing && (
+          <button
+            type="button"
+            onClick={() => setShowDiff((value) => !value)}
+            title={showDiff ? "收起修改对比" : "查看修改对比"}
+            className="mt-1 rounded px-1 text-[11px] leading-4 text-faint transition hover:text-mute hover:underline"
+          >
+            已编辑
+          </button>
+        )}
       </div>
+
+      {showDiff && lastEdit && (
+        <DiffView previous={lastEdit.previous} current={message.content} />
+      )}
+
+      {/* 所有模型输出都可编辑（纠正笔误）；最后一条被暂停的回答还可继续生成。 */}
+      {message.status !== "streaming" && !message.error && !editing && (
+        <div className="mt-2 flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="flex h-7 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-mute transition hover:bg-black/5 hover:text-ink"
+          >
+            <Pencil className="h-3 w-3" />
+            编辑
+          </button>
+          {isLast && message.status === "stopped" && message.content.trim() && (
+            <button
+              type="button"
+              onClick={() => onResume?.(message.id)}
+              className="flex h-7 items-center gap-1.5 rounded-full bg-brand-500/10 px-2.5 text-xs font-medium text-brand-600 transition hover:bg-brand-500/15 hover:text-brand-700"
+            >
+              <Play className="h-3 w-3" />
+              继续生成
+            </button>
+          )}
+        </div>
+      )}
+
+      {editing && (
+        <MessageEditor
+          initial={message.content}
+          placeholder="修改这条回答…（Ctrl/⌘ + Enter 保存）"
+          onSave={(content) => {
+            onEdit?.(message.id, content);
+            setEditing(false);
+          }}
+          onCancel={() => setEditing(false)}
+        />
+      )}
     </div>
   );
 }

@@ -122,11 +122,12 @@ export function pooledFetch(url: string, init?: UndiciRequestInit): Promise<Resp
 export async function queuedPooledFetch(
   env: Env,
   url: string,
-  init?: UndiciRequestInit
+  init?: UndiciRequestInit,
+  signal?: AbortSignal
 ): Promise<{ response: Response; release: Release }> {
   const release = await queue.acquire(env);
   try {
-    const response = await pooledFetch(url, init);
+    const response = await pooledFetch(url, { ...init, ...(signal ? { signal } : {}) });
     return { response, release };
   } catch (error) {
     release();
