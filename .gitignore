@@ -8,3 +8,4 @@ dist/
 *.log
 worker/seed-output/
 .session-data/
+dpsk
