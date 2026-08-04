@@ -1,15 +1,18 @@
 import { useCallback, useRef, useState } from "react";
-import { ImagePlus, Loader2, X } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import { compressImage, readAsDataURL } from "../lib/image";
 import { cn } from "../lib/utils";
 
 interface Props {
-  value: string | null;
   onChange: (dataUrl: string | null) => void;
   disabled?: boolean;
 }
 
-export function ImageUpload({ value, onChange, disabled }: Props) {
+/**
+ * The "+" picker button inside the composer. The selected-image preview is
+ * rendered by the Composer itself, so this component only handles picking.
+ */
+export function ImageUpload({ onChange, disabled }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -28,27 +31,6 @@ export function ImageUpload({ value, onChange, disabled }: Props) {
     },
     [disabled, onChange]
   );
-
-  if (value) {
-    return (
-      <div className="relative inline-block">
-        <img
-          src={value}
-          alt="已选择题目"
-          className="h-20 w-20 rounded-xl border border-[#555] object-cover"
-        />
-        <button
-          type="button"
-          onClick={() => onChange(null)}
-          disabled={disabled}
-          className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-[#4a4a4a] text-[#ececec] hover:bg-red-500 disabled:opacity-50"
-          aria-label="移除图片"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
-      </div>
-    );
-  }
 
   return (
     <>
@@ -82,8 +64,8 @@ export function ImageUpload({ value, onChange, disabled }: Props) {
           void handleFile(e.dataTransfer.files?.[0]);
         }}
         className={cn(
-          "flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#555] text-[#b4b4b4] transition hover:border-brand-500 hover:bg-[#3a3a3a] hover:text-brand-300",
-          dragging && "border-brand-500 bg-brand-500/10 text-brand-400",
+          "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-mute transition hover:bg-black/5 hover:text-ink",
+          dragging && "bg-brand-500/10 text-brand-600",
           disabled && "cursor-not-allowed opacity-50",
           busy && "pointer-events-none"
         )}
@@ -91,9 +73,9 @@ export function ImageUpload({ value, onChange, disabled }: Props) {
         title="上传题目图片（支持拖拽）"
       >
         {busy ? (
-          <Loader2 className="h-[18px] w-[18px] animate-spin" />
+          <Loader2 className="h-4 w-4 animate-spin" />
         ) : (
-          <ImagePlus className="h-[18px] w-[18px]" />
+          <Plus className="h-4 w-4" />
         )}
       </button>
     </>

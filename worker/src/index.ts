@@ -4,6 +4,7 @@ import { streamSSE } from "hono/streaming";
 import { runPipeline } from "./stream";
 import { deliverBrowserToolResult } from "./toolbridge";
 import { getModelCatalog, isAvailableModel } from "./model-catalog";
+import { generateTitle } from "./title";
 import { isSkillId, resolveModel, type ChatRequest, type Env } from "./types";
 import {
   authCookie,
@@ -28,7 +29,7 @@ app.use(
       return "*";
     },
     allowHeaders: ["Content-Type"],
-    allowMethods: ["GET", "POST", "OPTIONS"],
+    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   })
 );
 
@@ -150,6 +151,33 @@ app.get("/api/config", (c) => {
 app.get("/api/models", (c) => {
   c.header("Cache-Control", "no-store");
   return c.json(getModelCatalog(c.env));
+});
+
+/**
+ * POST /api/title — generates a short session title from the first Q&A pair.
+ * Best-effort: the client falls back to a truncated question on failure.
+ */
+app.post("/api/title", async (c) => {
+  let body: { question?: unknown; answer?: unknown; model?: unknown };
+  try {
+    body = await c.req.json<typeof body>();
+  } catch {
+    return c.json({ error: "请求体不是合法的 JSON" }, 400);
+  }
+  const question = typeof body.question === "string" ? body.question.trim().slice(0, 500) : "";
+  const answer = typeof body.answer === "string" ? body.answer.trim().slice(0, 800) : "";
+  if (!question && !answer) return c.json({ error: "缺少对话内容" }, 400);
+  const model =
+    typeof body.model === "string" && isAvailableModel(body.model, c.env)
+      ? body.model
+      : resolveModel(c.env.API_MODEL);
+  try {
+    const title = await generateTitle(c.env, model, question || "（图片题目）", answer);
+    if (!title) return c.json({ error: "标题生成为空" }, 502);
+    return c.json({ title });
+  } catch (error) {
+    return c.json({ error: `标题生成失败：${(error as Error).message.slice(0, 120)}` }, 502);
+  }
 });
 
 /**

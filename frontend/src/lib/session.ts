@@ -50,3 +50,10 @@ export async function saveRemoteSession(
   });
   if (!response.ok) throw new Error(`会话保存失败（${response.status}）`);
 }
+
+export async function deleteRemoteSession(sessionId: string): Promise<void> {
+  const response = await fetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
+  if (!response.ok && response.status !== 404) {
+    throw new Error(`会话删除失败（${response.status}）`);
+  }
+}

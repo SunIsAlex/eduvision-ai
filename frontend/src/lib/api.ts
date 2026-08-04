@@ -97,6 +97,25 @@ export async function streamChat(
   }
 }
 
+/** Ask the server to summarize the first Q&A pair into a short session title. */
+export async function fetchTitle(request: {
+  question: string;
+  answer: string;
+  model?: string;
+}): Promise<string> {
+  const response = await fetch("/api/title", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
+  });
+  const body = (await response.json().catch(() => ({}))) as {
+    title?: string;
+    error?: string;
+  };
+  if (!response.ok) throw new Error(body.error ?? `标题生成失败（${response.status}）`);
+  return (body.title ?? "").trim();
+}
+
 export async function fetchModels(): Promise<{
   models: ModelOption[];
   defaultModel: string;

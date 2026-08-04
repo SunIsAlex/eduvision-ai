@@ -5,7 +5,7 @@
  * Usage:  npm run dev:node --workspace worker
  */
 import { serve } from "@hono/node-server";
-import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { app } from "./index";
@@ -94,6 +94,15 @@ async function serveSession(request: Request, sessionId: string): Promise<Respon
       }
       throw error;
     }
+  }
+  if (request.method === "DELETE") {
+    try {
+      await unlink(sessionPath);
+    } catch (error) {
+      // Deleting an already-missing snapshot is a success for the client.
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+    return Response.json({ ok: true });
   }
   if (request.method !== "PUT") return new Response("Method Not Allowed", { status: 405 });
   const declaredLength = Number(request.headers.get("content-length") ?? 0);

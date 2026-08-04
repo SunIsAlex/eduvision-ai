@@ -1,19 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchModels, streamChat } from "../lib/api";
+import { fetchModels, fetchTitle, streamChat } from "../lib/api";
 import { loadMessages, removeSavedMessages, saveMessages } from "../lib/persist";
 import {
   createSessionId,
+  deleteRemoteSession,
   getOrCreateSessionId,
   loadRemoteSession,
   replaceSessionUrl,
   saveRemoteSession,
 } from "../lib/session";
+import {
+  loadSessionIndex,
+  persistSessionIndex,
+  removeSession,
+  renameSession,
+  upsertSession,
+  type SessionMeta,
+} from "../lib/sessionList";
 import { appendMarkdownDelta, uid } from "../lib/utils";
 import type { ChatMessage, ModelOption, SkillId, ThinkingStep } from "../lib/types";
 
 export function useChat() {
   const [sessionId, setSessionId] = useState(getOrCreateSessionId);
   const [messages, setMessages] = useState<ChatMessage[]>(() => loadMessages(sessionId));
+  const [sessions, setSessions] = useState<SessionMeta[]>(loadSessionIndex);
   const [input, setInput] = useState("");
   const [image, setImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -41,6 +51,9 @@ export function useChat() {
   const [contextBreak, setContextBreak] = useState(0);
   const [sessionReady, setSessionReady] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  // Sessions whose title was already requested this page load (guard against
+  // the effect re-firing while the title request is still in flight).
+  const titleRequestedRef = useRef(new Set<string>());
 
   useEffect(() => {
     let active = true;
@@ -89,10 +102,44 @@ export function useChat() {
     );
     if (streaming) return;
     saveMessages(sessionId, messages);
+    // Sessions only enter the drawer index once they hold real content.
+    if (messages.length > 0) {
+      setSessions((prev) => persistSessionIndex(upsertSession(prev, sessionId)));
+    }
     void saveRemoteSession(sessionId, { messages, contextBreak }).catch((error) =>
       console.warn("[session] save failed:", error)
     );
   }, [messages, contextBreak, sessionId, sessionReady]);
+
+  // 首个完整回答落盘后，让模型为会话生成一个简短标题；失败时回退到首条问题截断。
+  useEffect(() => {
+    if (!sessionReady) return;
+    if (titleRequestedRef.current.has(sessionId)) return;
+    const meta = sessions.find((item) => item.id === sessionId);
+    if (meta?.titleGenerated) return;
+    const firstUser = messages.find((m) => m.role === "user");
+    const firstAnswer = messages.find(
+      (m) => m.role === "assistant" && m.status === "done" && !m.error && m.content.trim()
+    );
+    if (!firstUser || !firstAnswer) return;
+    titleRequestedRef.current.add(sessionId);
+    const question = firstUser.content.trim();
+    const fallback = question.replace(/\s+/g, " ").slice(0, 18) || "图片题目";
+    const apply = (title: string) =>
+      setSessions((prev) =>
+        persistSessionIndex(renameSession(prev, sessionId, title || fallback))
+      );
+    void fetchTitle({
+      question,
+      answer: firstAnswer.content.slice(0, 800),
+      model: firstAnswer.model || selectedModel || undefined,
+    })
+      .then(apply)
+      .catch((error: unknown) => {
+        console.warn("[session] title generation failed:", error);
+        apply("");
+      });
+  }, [messages, sessionId, sessionReady, sessions, selectedModel]);
 
   useEffect(() => {
     try {
@@ -271,10 +318,14 @@ export function useChat() {
     abortRef.current?.abort();
   }, []);
 
+  /**
+   * 新对话：保留旧会话（它已留在会话列表里），只切换到全新的空白会话。
+   * sessionReady 与 id 变更同步置 false，避免自动保存把旧消息写进新 id。
+   */
   const reset = useCallback(() => {
     stop();
-    removeSavedMessages(sessionId);
     const nextSessionId = createSessionId();
+    setSessionReady(false);
     replaceSessionUrl(nextSessionId);
     setSessionId(nextSessionId);
     setMessages([]);
@@ -283,11 +334,43 @@ export function useChat() {
     setThinking([]);
     setLoading(false);
     setContextBreak(0);
-  }, [sessionId, stop]);
+  }, [stop]);
+
+  /** 切换到会话列表中的某个历史会话。 */
+  const switchSession = useCallback(
+    (nextSessionId: string) => {
+      if (nextSessionId === sessionId) return;
+      stop();
+      setSessionReady(false);
+      replaceSessionUrl(nextSessionId);
+      setSessionId(nextSessionId);
+      setMessages(loadMessages(nextSessionId));
+      setInput("");
+      setImage(null);
+      setThinking([]);
+      setLoading(false);
+      setContextBreak(0);
+    },
+    [sessionId, stop]
+  );
+
+  /** 删除会话：清掉本地索引、本地消息和服务端快照；删除当前会话则另起新会话。 */
+  const deleteSession = useCallback(
+    (targetId: string) => {
+      setSessions((prev) => persistSessionIndex(removeSession(prev, targetId)));
+      removeSavedMessages(targetId);
+      void deleteRemoteSession(targetId).catch((error) =>
+        console.warn("[session] remote delete failed:", error)
+      );
+      if (targetId === sessionId) reset();
+    },
+    [sessionId, reset]
+  );
 
   return {
     messages,
     sessionId,
+    sessions,
     input,
     setInput,
     image,
@@ -307,5 +390,7 @@ export function useChat() {
     send,
     stop,
     reset,
+    switchSession,
+    deleteSession,
   };
 }

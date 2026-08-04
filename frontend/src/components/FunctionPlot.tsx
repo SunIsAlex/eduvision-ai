@@ -110,7 +110,7 @@ export function FunctionPlot({ raw }: { raw: string }) {
           notes: false,
           links: false,
           degreeMode: spec.degreeMode === true,
-          invertedColors: true,
+          invertedColors: false,
         });
         calculator.setExpressions(
           spec.expressions.map((expression, index) => ({
@@ -142,11 +142,11 @@ export function FunctionPlot({ raw }: { raw: string }) {
     };
   }, [expanded, raw]);
 
-  if (!spec) return <p className="text-xs text-red-300">绘图参数无法解析</p>;
+  if (!spec) return <p className="text-xs text-red-500">绘图参数无法解析</p>;
 
   return (
-    <div className="mt-2 overflow-hidden rounded-md border border-slate-800 bg-slate-950/70">
-      <div className="space-y-1 px-3 py-2 font-mono text-xs text-sky-200">
+    <div className="mt-2 overflow-hidden rounded-md border border-line bg-[#f5f3ec]">
+      <div className="space-y-1 px-3 py-2 font-mono text-xs text-ink">
         {spec.expressions.map((expression, index) => (
           <div key={`${index}-${expression.latex}`} className="flex items-center gap-2 break-all">
             <span
@@ -158,17 +158,17 @@ export function FunctionPlot({ raw }: { raw: string }) {
         ))}
       </div>
       {expanded && (
-        <div className="relative h-80 border-t border-slate-800">
+        <div className="relative h-80 border-t border-line">
           <div ref={hostRef} className="h-full w-full" />
           {state === "loading" && (
-            <div className="absolute inset-0 flex items-center justify-center gap-2 bg-slate-950/90 text-xs text-slate-300">
+            <div className="absolute inset-0 flex items-center justify-center gap-2 bg-white/85 text-xs text-mute">
               <Loader2 className="h-4 w-4 animate-spin" /> 正在加载 Desmos…
             </div>
           )}
           {state === "fallback" && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-950 px-5 text-center text-xs text-slate-400">
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-card px-5 text-center text-xs text-mute">
               <span>{error}；已保留表达式，可继续阅读答案。</span>
-              <a className="inline-flex items-center gap-1 text-sky-400 hover:text-sky-300" href="https://www.desmos.com/calculator" target="_blank" rel="noreferrer">
+              <a className="inline-flex items-center gap-1 text-brand-600 hover:text-brand-500" href="https://www.desmos.com/calculator" target="_blank" rel="noreferrer">
                 打开 Desmos <ExternalLink className="h-3 w-3" />
               </a>
             </div>
@@ -177,7 +177,7 @@ export function FunctionPlot({ raw }: { raw: string }) {
       )}
       <button
         type="button"
-        className="flex w-full items-center justify-center gap-1.5 border-t border-slate-800 px-3 py-2 text-xs text-sky-400 hover:bg-slate-900 hover:text-sky-300"
+        className="flex w-full items-center justify-center gap-1.5 border-t border-line px-3 py-2 text-xs text-brand-600 hover:bg-black/[0.03] hover:text-brand-700"
         onClick={() => setExpanded((value) => !value)}
       >
         <LineChart className="h-3.5 w-3.5" /> {expanded ? "收起图像" : "展开交互图像"}
