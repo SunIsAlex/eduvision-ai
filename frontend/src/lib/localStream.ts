@@ -163,17 +163,21 @@ export async function streamLocalChat(
   const thinking = Boolean(request.thinking);
   const activeModel = effectiveModel(config, selected, thinking, available);
   let forceFormalAnswer = false;
-  const vision = available.find((model) => model.multimodal && model.id !== selected)?.id;
-  if (image && vision && !imageModel(selected, available)) {
+  const selectedSupportsImage = imageModel(activeModel, available);
+  const vision = selectedSupportsImage
+    ? activeModel
+    : available.find((model) => model.multimodal)?.id;
+  if (image && vision) {
     cb.onThinking(`正在使用 ${vision} 做题目 OCR 复述…`);
     try {
       const transcription = await ocrImage(config, vision, image, signal);
       question = `${question}\n\n${transcription}`.trim();
       cb.onOcrResult?.(question);
       cb.onDebug?.("local_ocr", { model: vision, text: transcription });
-      // The selected text-only model receives the verified transcription, not
-      // the image it cannot process. Historical images are omitted below too.
-      image = undefined;
+      // A multimodal solver receives both the editable transcription and the
+      // original image, preserving diagrams/layout. A text-only solver gets
+      // only the transcription it can actually consume.
+      if (!selectedSupportsImage) image = undefined;
     } catch (error) {
       cb.onError(error instanceof Error ? error.message : "图片 OCR 失败");
       return;
@@ -185,7 +189,7 @@ export async function streamLocalChat(
       ...request,
       question,
       image,
-      history: imageModel(selected, available)
+      history: selectedSupportsImage
         ? request.history
         : request.history.map((item) => ({ ...item, image: undefined })),
     }),
