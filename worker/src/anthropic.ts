@@ -81,7 +81,16 @@ async function* parseSse(
 }
 
 export type StreamDelta =
+  | { kind: "status"; text: string }
+  | {
+      kind: "line_check";
+      blockId: number;
+      status: "running" | "passed" | "failed";
+      detail?: string;
+    }
   | { kind: "reasoning"; text: string }
+  | { kind: "plan"; text: string }
+  | { kind: "verify"; text: string }
   | { kind: "content"; text: string }
   | { kind: "debug"; round: number; finishReason: string | null; reasoning: string; content: string; toolCalls: ToolCallParts[] }
   | { kind: "tool_call"; requestId: string; toolCallId: string; name: string; args: string; executor: "server" | "browser" }

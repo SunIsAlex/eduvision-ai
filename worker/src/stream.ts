@@ -6,6 +6,9 @@ export interface StreamEvent {
   event:
     | "thinking"
     | "reasoning"
+    | "plan"
+    | "verify"
+    | "line_check"
     | "answer"
     | "tool_call"
     | "tool_result"
@@ -72,16 +75,32 @@ export async function* runPipeline(
         requestId: request.requestId,
         thinking: request.thinking === true,
         skill: request.skill ?? "general",
+        ultra: request.ultra === true,
       },
       signal
     );
     try {
       for await (const delta of gen) {
         if (signal?.aborted) return;
-        if (delta.kind === "reasoning") {
+        if (delta.kind === "status") {
+          yield thinking(delta.text);
+        } else if (delta.kind === "line_check") {
+          yield {
+            event: "line_check",
+            data: JSON.stringify({
+              blockId: delta.blockId,
+              status: delta.status,
+              ...(delta.detail ? { detail: delta.detail } : {}),
+            }),
+          };
+        } else if (delta.kind === "reasoning") {
           // Forward Anthropic summarized-thinking deltas live. These are not
           // the model's private/raw chain of thought.
           yield { event: "reasoning", data: JSON.stringify({ text: delta.text }) };
+        } else if (delta.kind === "plan") {
+          yield { event: "plan", data: JSON.stringify({ text: delta.text }) };
+        } else if (delta.kind === "verify") {
+          yield { event: "verify", data: JSON.stringify({ text: delta.text }) };
         } else if (delta.kind === "content") {
           emittedContent = true;
           yield { event: "answer", data: JSON.stringify({ text: delta.text }) };

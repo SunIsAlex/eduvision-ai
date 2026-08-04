@@ -303,7 +303,6 @@ function ChatApp() {
                 thinking={
                   m.role === "assistant" &&
                   m.status === "streaming" &&
-                  !m.content &&
                   i === chat.messages.length - 1
                     ? chat.thinking
                     : undefined
@@ -325,6 +324,8 @@ function ChatApp() {
         loading={chat.loading}
         thinkingEnabled={chat.thinkingEnabled}
         onThinkingEnabledChange={chat.setThinkingEnabled}
+        ultraEnabled={chat.ultraEnabled}
+        onUltraEnabledChange={chat.setUltraEnabled}
         selectedSkill={chat.selectedSkill}
         onSelectedSkillChange={chat.setSelectedSkill}
       />

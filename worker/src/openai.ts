@@ -52,7 +52,11 @@ function toOpenAIMessages(messages: MessageParam[]): OpenAIMessage[] {
             const url = source?.type === "base64"
               ? `data:${String(source.media_type)};base64,${String(source.data)}`
               : String(source?.url ?? "");
-            return { type: "image_url", image_url: { url } };
+            // Homework screenshots often contain tiny subscripts (for example
+            // △ABQ vs △DBQ). OpenAI's automatic detail selection may use a
+            // low-resolution vision pass and collapse those glyphs, so force
+            // the high-detail path for faithful mathematical transcription.
+            return { type: "image_url", image_url: { url, detail: "high" } };
           }
           return { type: "text", text: String(block.text ?? "") };
         }),
@@ -71,6 +75,11 @@ export async function createOpenAIStream(
   const baseURL = (env.API_URL ?? DEFAULT_BASE_URL).replace(/\/$/, "");
   const summarizedThinking = Boolean(params.thinking);
   const supportsReasoningEffort = /^(?:gpt-|o\d|codex)/i.test(params.model);
+  const configuredEffort = (params.output_config as { effort?: unknown } | undefined)?.effort;
+  const reasoningEffort =
+    configuredEffort === "medium" || configuredEffort === "high"
+      ? configuredEffort
+      : "low";
   const system = String(params.system ?? "") +
     "\n\nLaTeX 输出要求：每个数学分隔符及花括号必须成对闭合，尤其检查 \\frac、\\sqrt、上下标、\\text 和 \\tag 的参数。" +
     (summarizedThinking
@@ -90,7 +99,16 @@ export async function createOpenAIStream(
     })),
     ...(params.temperature !== undefined ? { temperature: params.temperature } : {}),
     ...(supportsReasoningEffort
-      ? { reasoning_effort: summarizedThinking ? "low" : "none" }
+      ? {
+          reasoning_effort:
+            configuredEffort === "low" ||
+            configuredEffort === "medium" ||
+            configuredEffort === "high"
+              ? reasoningEffort
+              : summarizedThinking
+                ? reasoningEffort
+                : "none",
+        }
       : {}),
     ...(params.tool_choice && (params.tool_choice as Record<string, unknown>).type === "tool"
       ? {

@@ -160,6 +160,8 @@ async function loadDevEnv(): Promise<Env> {
     API_KEY: vars.API_KEY ?? process.env.API_KEY ?? "",
     API_URL: vars.API_URL ?? process.env.API_URL,
     API_MODEL: vars.API_MODEL ?? vars.AI_MODEL ?? process.env.API_MODEL ?? process.env.AI_MODEL,
+    API_MODEL_ULTRA: vars.API_MODEL_ULTRA ?? process.env.API_MODEL_ULTRA,
+    API_MODEL_REVIEW: vars.API_MODEL_REVIEW ?? process.env.API_MODEL_REVIEW,
     DESMOS_API_KEY: vars.DESMOS_API_KEY ?? process.env.DESMOS_API_KEY,
     ACCESS_PASSWORD: vars.ACCESS_PASSWORD ?? process.env.ACCESS_PASSWORD,
     ADMIN_ACCESS_PASSWORD: vars.ADMIN_ACCESS_PASSWORD ?? process.env.ADMIN_ACCESS_PASSWORD,

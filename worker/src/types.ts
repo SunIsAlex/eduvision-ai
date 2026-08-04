@@ -22,6 +22,8 @@ export interface ChatRequest {
   model?: string;
   /** User-selected domain prompt module. Never inferred by the server. */
   skill?: SkillId;
+  /** Ultra 模式：高智力模型规划思路，子代理校验数值后再作答。 */
+  ultra?: boolean;
 }
 
 export const SKILL_IDS = ["general", "math", "chemistry"] as const;
@@ -37,6 +39,10 @@ export interface Env {
   API_URL?: string;
   /** Override the text reasoning/answering model (see MODELS). */
   API_MODEL?: string;
+  /** Ultra 模式使用的高智力模型；缺省时回退到 API_MODEL。 */
+  API_MODEL_ULTRA?: string;
+  /** Ultra 增量逐块审核使用的快速模型。 */
+  API_MODEL_REVIEW?: string;
   /** Public browser API key issued by Desmos for production embedding. */
   DESMOS_API_KEY?: string;
   /** Optional shared password protecting every private API endpoint. */
@@ -62,6 +68,16 @@ export const MODELS = {
 export function resolveModel(configured?: string): string {
   const model = configured?.trim();
   return model || MODELS.VISION;
+}
+
+/** Ultra 模式使用的“高智力”模型；未配置时回退到默认模型。 */
+export function resolveUltraModel(env: Env): string {
+  return env.API_MODEL_ULTRA?.trim() || resolveModel(env.API_MODEL);
+}
+
+/** 增量审核优先低延迟；与最终答案/兜底复核的高智力模型相互独立。 */
+export function resolveReviewModel(env: Env): string {
+  return env.API_MODEL_REVIEW?.trim() || "gpt-5.6-luna";
 }
 
 export const DEFAULT_BASE_URL = "https://api.mytokk.com";

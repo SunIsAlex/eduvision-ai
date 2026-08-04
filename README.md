@@ -26,6 +26,7 @@ MyTokk Anthropic-compatible API → claude-sonnet-4-6
 
 - Claude 原生多模态读图与连续对话，保留历史文字和图片。
 - 可选 adaptive thinking 摘要。
+- 可选 Ultra 模式：高智力模型先规划解题思路，作答完成后由子代理复核最终答案的数值与代数结论，发现不一致时自动追加修正。
 - SSE 流式答案、工具调用卡片和原始响应调试面板。
 - VPS 加固版 calculator 与浏览器 Web Worker JavaScript 沙箱。
 - 每个会话生成不可猜测的 URL，可跨设备恢复并分享调试。
@@ -68,6 +69,10 @@ VPS 文件和脚本位于 `ops/eduvision-vps/`：
 API_URL=https://api.mytokk.com
 API_KEY=...
 API_MODEL=claude-sonnet-4-6
+# 可选：Ultra 模式使用的高智力模型；缺省时回退到 API_MODEL
+API_MODEL_ULTRA=gpt-5.6-sol
+# 可选：逐块增量审核使用的低延迟模型
+API_MODEL_REVIEW=gpt-5.6-luna
 # 可选：向 Desmos 申请的生产嵌入 key；缺省时绘图卡片降级显示表达式
 DESMOS_API_KEY=...
 # 可选：启用全站 API 密码鉴权（密码仅保存在服务器，不要提交到 Git）

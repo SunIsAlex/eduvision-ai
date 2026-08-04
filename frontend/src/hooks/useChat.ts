@@ -18,6 +18,7 @@ import {
   type SessionMeta,
 } from "../lib/sessionList";
 import { appendMarkdownDelta, uid } from "../lib/utils";
+import { prepareImageForVision } from "../lib/image";
 import type { ApiMessage, ChatMessage, ModelOption, SkillId, ThinkingStep } from "../lib/types";
 
 export function useChat() {
@@ -42,6 +43,13 @@ export function useChat() {
   const [thinkingEnabled, setThinkingEnabled] = useState(() => {
     try {
       return window.localStorage.getItem("eduvision-thinking-enabled") === "true";
+    } catch {
+      return false;
+    }
+  });
+  const [ultraEnabled, setUltraEnabled] = useState(() => {
+    try {
+      return window.localStorage.getItem("eduvision-ultra-enabled") === "true";
     } catch {
       return false;
     }
@@ -157,6 +165,14 @@ export function useChat() {
     }
   }, [selectedSkill]);
 
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("eduvision-ultra-enabled", String(ultraEnabled));
+    } catch {
+      // Storage may be unavailable in private or restricted browser contexts.
+    }
+  }, [ultraEnabled]);
+
   /**
    * 普通发送与“继续生成”共用的 SSE 回调。onError 在已有内容时把消息置为
    * stopped（保留部分回答），避免像旧逻辑那样永远停在 streaming。
@@ -194,6 +210,27 @@ export function useChat() {
           };
         }),
       onThinking: (text) => setThinking((prev) => [...prev, { text }]),
+      onPlan: (delta) => {
+        setThinking([]);
+        patch((m) => ({ ...m, plan: (m.plan ?? "") + delta }));
+      },
+      onVerify: (delta) => {
+        setThinking([]);
+        patch((m) => ({ ...m, verify: (m.verify ?? "") + delta }));
+      },
+      onLineCheck: (check) => {
+        patch((m) => {
+          const checks = m.lineChecks ?? [];
+          const existing = checks.findIndex((item) => item.blockId === check.blockId);
+          return {
+            ...m,
+            lineChecks:
+              existing < 0
+                ? [...checks, check]
+                : checks.map((item, index) => (index === existing ? check : item)),
+          };
+        });
+      },
       onReasoning: (delta) => {
         setThinking([]);
         patch((m) => ({ ...m, reasoning: (m.reasoning ?? "") + delta }));
@@ -256,15 +293,19 @@ export function useChat() {
       failAsError: boolean;
     }) => {
       try {
+        const requestImage = opts.image
+          ? await prepareImageForVision(opts.image).catch(() => opts.image)
+          : undefined;
         await streamChat(
           {
             requestId: opts.requestId,
-            image: opts.image,
+            image: requestImage,
             question: opts.question,
             history: opts.history,
             thinking: thinkingEnabled,
             model: selectedModel || undefined,
             skill: selectedSkill,
+            ultra: ultraEnabled,
           },
           makeStreamCallbacks(opts.patch),
           opts.signal
@@ -286,7 +327,7 @@ export function useChat() {
         }
       }
     },
-    [thinkingEnabled, selectedModel, selectedSkill, makeStreamCallbacks]
+    [thinkingEnabled, selectedModel, selectedSkill, ultraEnabled, makeStreamCallbacks]
   );
 
   const send = useCallback(async () => {
@@ -591,6 +632,8 @@ ${m.content}`.trim();
     thinking,
     thinkingEnabled,
     setThinkingEnabled,
+    ultraEnabled,
+    setUltraEnabled,
     models,
     selectedModel,
     setSelectedModel,

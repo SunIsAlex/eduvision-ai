@@ -6,6 +6,12 @@ export interface ChatMessage {
   content: string;
   /** Provider-generated summarized thinking shown live (assistant only). */
   reasoning?: string;
+  /** Ultra 模式：子代理规划的解题思路（assistant only）。 */
+  plan?: string;
+  /** Ultra 模式：子代理对最终答案的复核报告（assistant only）。 */
+  verify?: string;
+  /** Ultra 模式：按 Markdown 语义块增量复核的状态。 */
+  lineChecks?: LineCheck[];
   /** Tool calls made while producing this answer (assistant only). */
   tools?: ToolActivity[];
   image?: string;
@@ -26,6 +32,12 @@ export interface DebugEvent {
   event: string;
   data: Record<string, unknown>;
   at: string;
+}
+
+export interface LineCheck {
+  blockId: number;
+  status: "running" | "passed" | "failed";
+  detail?: string;
 }
 
 /** 一次编辑记录：previous 为该次编辑前的完整内容。 */

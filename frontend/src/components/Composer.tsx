@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { ArrowUp, BookOpen, Brain, Square, X } from "lucide-react";
+import { ArrowUp, BookOpen, Brain, Sparkles, Square, X } from "lucide-react";
 import { ImageUpload } from "./ImageUpload";
 import { cn } from "../lib/utils";
 import type { SkillId } from "../lib/types";
@@ -15,6 +15,8 @@ interface Props {
   disabled?: boolean;
   thinkingEnabled: boolean;
   onThinkingEnabledChange: (enabled: boolean) => void;
+  ultraEnabled: boolean;
+  onUltraEnabledChange: (enabled: boolean) => void;
   selectedSkill: SkillId;
   onSelectedSkillChange: (skill: SkillId) => void;
 }
@@ -98,6 +100,24 @@ export function Composer(props: Props) {
             >
               <Brain className="h-3.5 w-3.5" />
               深度思考
+            </button>
+
+            <button
+              type="button"
+              role="switch"
+              aria-checked={props.ultraEnabled}
+              disabled={loading || disabled}
+              onClick={() => props.onUltraEnabledChange(!props.ultraEnabled)}
+              className={cn(
+                chip,
+                "disabled:opacity-50",
+                props.ultraEnabled &&
+                  "bg-violet-500/10 text-violet-600 hover:bg-violet-500/15 hover:text-violet-600"
+              )}
+              title="Ultra 模式：由高智力模型规划解题思路，子代理用工具自动校验数值后再作答（更慢、更消耗额度）"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              Ultra
             </button>
 
             <label className={cn(chip, "cursor-pointer focus-within:bg-black/5")}>

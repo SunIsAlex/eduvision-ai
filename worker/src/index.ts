@@ -4,6 +4,7 @@ import { streamSSE } from "hono/streaming";
 import { runPipeline } from "./stream";
 import { cancelBrowserToolWaits, deliverBrowserToolResult } from "./toolbridge";
 import { getModelCatalog, isAvailableModel } from "./model-catalog";
+import { resolveReviewModel, resolveUltraModel } from "./types";
 import { generateTitle } from "./title";
 import { isSkillId, resolveModel, type ChatRequest, type Env } from "./types";
 import {
@@ -132,6 +133,8 @@ app.get("/health", (c) =>
     service: "eduvision-ai",
     models: {
       answer: resolveModel(c.env.API_MODEL),
+      ultra: resolveUltraModel(c.env),
+      review: resolveReviewModel(c.env),
     },
     uploads: false,
     upstream: getUpstreamStatus(c.env),
@@ -209,6 +212,9 @@ app.post("/api/chat/stream", async (c) => {
   if (body.skill !== undefined && !isSkillId(body.skill)) {
     return c.json({ error: "所选 SKILL 不存在" }, 400);
   }
+  if (body.ultra !== undefined && typeof body.ultra !== "boolean") {
+    return c.json({ error: "ultra 参数无效" }, 400);
+  }
 
   return streamSSE(c, async (stream) => {
     // 客户端断开（点“停止”或直接关闭页面）时取消上游流，避免继续消耗
@@ -265,4 +271,3 @@ app.post("/api/tool/result", async (c) => {
   }
   return c.json({ ok: true });
 });
-

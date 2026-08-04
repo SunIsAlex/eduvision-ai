@@ -17,7 +17,7 @@ const agent = new Agent({
   pipelining: 1,
   keepAliveTimeout: 30_000,
   keepAliveMaxTimeout: 120_000,
-  headersTimeout: 60_000,
+  headersTimeout: 120_000,
   bodyTimeout: 300_000,
   connectTimeout: 15_000,
 });

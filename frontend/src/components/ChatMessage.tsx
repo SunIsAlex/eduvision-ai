@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Brain, Calculator, Check, Code, Copy, LineChart, Loader2, Pencil, Play, Square, TriangleAlert } from "lucide-react";
+import { Brain, Calculator, Check, CheckCircle2, Code, Copy, Lightbulb, LineChart, Loader2, Pencil, Play, ShieldCheck, Square, TriangleAlert, XCircle } from "lucide-react";
 import { Markdown } from "./Markdown";
 import { FunctionPlot } from "./FunctionPlot";
 import { DiffView } from "./DiffView";
@@ -24,6 +24,64 @@ interface Props {
 const PIPELINE_LABELS: Record<string, string> = {
   multimodal: "多模态智能解答",
 };
+
+function answerBlocks(content: string): string[] {
+  return content.split(/\n{2,}/).map((block) => block.trim()).filter(Boolean);
+}
+
+function ReviewedAnswer({ message }: { message: Message }) {
+  const checks = message.lineChecks ?? [];
+  if (checks.length === 0) return <Markdown content={message.content} />;
+
+  const checkByBlock = new Map(checks.map((check) => [check.blockId, check]));
+  return (
+    <div className="space-y-3">
+      {answerBlocks(message.content).map((block, blockId) => {
+        const check = checkByBlock.get(blockId);
+        return (
+          <div key={blockId} className="group flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <Markdown content={block} />
+            </div>
+            {check && (
+              <span
+                className={cn(
+                  "mt-1.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full",
+                  check.status === "passed" && "bg-emerald-50 text-emerald-600",
+                  check.status === "failed" && "bg-red-50 text-red-600",
+                  check.status === "running" && "bg-slate-100 text-slate-400"
+                )}
+                title={
+                  check.detail ||
+                  (check.status === "running"
+                    ? "子模型正在审核"
+                    : check.status === "passed"
+                      ? "子模型审核通过"
+                      : "子模型发现问题")
+                }
+                aria-label={
+                  check.status === "running"
+                    ? "正在审核"
+                    : check.status === "passed"
+                      ? "审核通过"
+                      : "审核失败"
+                }
+              >
+                {check.status === "running" ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : check.status === "passed" ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                  <XCircle className="h-4 w-4" />
+                )}
+              </span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 function prettyArgs(raw: string): string {
   try {
@@ -266,6 +324,44 @@ export function ChatMessage({ message, thinking, showDebug = false, isLast = fal
         </div>
       )}
 
+      {/* Ultra：子代理规划的解题思路 */}
+      {message.plan && (
+        <details
+          open={message.status === "streaming" && !message.reasoning && !message.content}
+          className="mb-3 overflow-hidden rounded-xl border border-line bg-card"
+        >
+          <summary className="flex cursor-pointer select-none items-center gap-2 px-3 py-2 text-xs text-mute transition hover:text-ink">
+            <Lightbulb className="h-3.5 w-3.5 shrink-0" />
+            解题思路（Ultra）
+            {message.status === "streaming" && !message.reasoning && !message.content && (
+              <Loader2 className="ml-auto h-3 w-3 animate-spin" />
+            )}
+          </summary>
+          <div className="border-t border-line px-4 py-3 text-sm leading-6">
+            <Markdown content={message.plan} />
+          </div>
+        </details>
+      )}
+
+      {/* Ultra：子代理对最终答案的复核报告 */}
+      {message.verify && (
+        <details
+          open={message.status === "streaming"}
+          className="mb-3 overflow-hidden rounded-xl border border-line bg-card"
+        >
+          <summary className="flex cursor-pointer select-none items-center gap-2 px-3 py-2 text-xs text-mute transition hover:text-ink">
+            <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+            子代理复核
+            {message.status === "streaming" && (
+              <Loader2 className="ml-auto h-3 w-3 animate-spin" />
+            )}
+          </summary>
+          <div className="border-t border-line px-4 py-3 text-sm leading-6">
+            <Markdown content={message.verify} />
+          </div>
+        </details>
+      )}
+
       {/* Provider-generated summarized thinking, similar to the Claude app. */}
       {message.reasoning && (
         <details
@@ -392,7 +488,7 @@ export function ChatMessage({ message, thinking, showDebug = false, isLast = fal
             {message.content}
           </p>
         ) : message.content ? (
-          <Markdown content={message.content} />
+          <ReviewedAnswer message={message} />
         ) : message.status === "stopped" ? (
           <span className="inline-flex items-center gap-1.5 text-xs text-mute">
             <Square className="h-3 w-3" />

@@ -4,6 +4,13 @@ import { runTool } from "./toolRunner";
 export interface StreamCallbacks {
   onDebug?: (event: string, data: Record<string, unknown>) => void;
   onThinking: (text: string) => void;
+  onPlan: (delta: string) => void;
+  onVerify: (delta: string) => void;
+  onLineCheck: (check: {
+    blockId: number;
+    status: "running" | "passed" | "failed";
+    detail?: string;
+  }) => void;
   onReasoning: (delta: string) => void;
   onAnswer: (delta: string) => void;
   onToolCall: (tool: {
@@ -35,6 +42,7 @@ export async function streamChat(
     thinking?: boolean;
     model?: string;
     skill?: SkillId;
+    ultra?: boolean;
   },
   callbacks: StreamCallbacks,
   signal?: AbortSignal
@@ -80,7 +88,15 @@ export async function streamChat(
         const event = await handleFrame(frame, callbacks, { requestId: request.requestId, signal });
         // One fetch chunk can contain many SSE deltas. Yield a paint frame so
         // React does not batch the whole chunk into one visible text jump.
-        if ((event === "answer" || event === "reasoning") && ++paintDeltas % 4 === 0) {
+        if (
+          (event === "answer" ||
+            event === "reasoning" ||
+            event === "plan" ||
+            event === "verify" ||
+            event === "line_check" ||
+            event === "thinking") &&
+          paintDeltas++ % 4 === 0
+        ) {
           await new Promise<void>((resolve) => {
             if (document.hidden) window.setTimeout(resolve, 0);
             else requestAnimationFrame(() => resolve());
@@ -158,6 +174,9 @@ async function handleFrame(
       executor?: string;
       ok?: boolean;
       output?: string;
+      blockId?: number;
+      status?: string;
+      detail?: string;
     };
     cb.onDebug?.(event, parsed as Record<string, unknown>);
     switch (event) {
@@ -166,6 +185,26 @@ async function handleFrame(
         break;
       case "answer":
         if (parsed.text) cb.onAnswer(parsed.text);
+        break;
+      case "plan":
+        if (parsed.text) cb.onPlan(parsed.text);
+        break;
+      case "verify":
+        if (parsed.text) cb.onVerify(parsed.text);
+        break;
+      case "line_check":
+        if (
+          typeof parsed.blockId === "number" &&
+          (parsed.status === "running" ||
+            parsed.status === "passed" ||
+            parsed.status === "failed")
+        ) {
+          cb.onLineCheck({
+            blockId: parsed.blockId,
+            status: parsed.status,
+            ...(parsed.detail ? { detail: parsed.detail } : {}),
+          });
+        }
         break;
       case "reasoning":
         if (parsed.text) cb.onReasoning(parsed.text);
@@ -236,4 +275,3 @@ async function executeAndDeliverBrowserTool(
     console.warn("[tool] result delivery error:", (error as Error).message);
   }
 }
-
