@@ -153,6 +153,7 @@ export async function streamLocalChat(
   const selected = request.model || "gpt-5.6-luna";
   const thinking = Boolean(request.thinking);
   const activeModel = effectiveModel(config, selected, thinking, available);
+  let forceFormalAnswer = false;
   const vision = available.find((model) => model.multimodal && model.id !== selected)?.id;
   if (image && vision && !imageModel(selected, available)) {
     cb.onThinking(`正在使用 ${vision} 做题目 OCR 复述…`);
@@ -194,7 +195,7 @@ export async function streamLocalChat(
         messages: conversation,
         tools: [CALCULATOR_TOOL],
         ...(isDeepSeek(config)
-          ? { thinking: { type: thinking ? "enabled" : "disabled" } }
+          ? { thinking: { type: thinking && !forceFormalAnswer ? "enabled" : "disabled" } }
           : {}),
       }),
       signal,
@@ -260,6 +261,16 @@ export async function streamLocalChat(
     if (buffer.trim()) consume(buffer);
 
     if (toolCalls.size === 0 || finishReason !== "tool_calls") {
+      if (thinking && !forceFormalAnswer && !content.trim() && reasoning.trim()) {
+        forceFormalAnswer = true;
+        cb.onThinking("思考完成，正在请求正式答案…");
+        conversation.push({ role: "assistant", content: "", reasoning_content: reasoning });
+        conversation.push({
+          role: "user",
+          content: "思考已经完成。现在只输出给用户看的正式答案和必要的关键推导，不要输出思维链，不要省略最终结论。",
+        });
+        continue;
+      }
       cb.onDone({ pipeline: "browser-local", model: activeModel });
       return;
     }
