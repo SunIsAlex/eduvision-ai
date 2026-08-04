@@ -68,6 +68,23 @@ function imageModel(model: string | undefined, available: ModelOption[]): boolea
   return /vision|omni|4o|4\.1|sonnet|gemini|luna|sol/i.test(model ?? "");
 }
 
+function isDeepSeek(config: LocalApiConfig): boolean {
+  return /deepseek\.com/i.test(config.apiUrl);
+}
+
+function effectiveModel(
+  config: LocalApiConfig,
+  selected: string,
+  thinking: boolean,
+  available: ModelOption[]
+): string {
+  if (!isDeepSeek(config)) return selected;
+  const wanted = thinking ? /reasoner|reasoning/i : /chat(?!.*reasoner)|v3/i;
+  const opposite = thinking ? /chat(?!.*reasoner)/i : /reasoner|reasoning/i;
+  if (wanted.test(selected) && !opposite.test(selected)) return selected;
+  return available.find((model) => wanted.test(model.id))?.id ?? selected;
+}
+
 function contentText(value: unknown): string {
   if (typeof value === "string") return value;
   if (!Array.isArray(value)) return "";
@@ -134,6 +151,8 @@ export async function streamLocalChat(
   let image = request.image;
   const available = request.availableModels ?? [];
   const selected = request.model || "gpt-5.6-luna";
+  const thinking = Boolean(request.thinking);
+  const activeModel = effectiveModel(config, selected, thinking, available);
   const vision = available.find((model) => model.multimodal && model.id !== selected)?.id;
   if (image && vision && !imageModel(selected, available)) {
     cb.onThinking(`正在使用 ${vision} 做题目 OCR 复述…`);
@@ -149,7 +168,7 @@ export async function streamLocalChat(
     }
   }
   const conversation: OpenAIMessage[] = [
-    { role: "system", content: localSystem(Boolean(request.thinking), Boolean(request.ultra)) },
+    { role: "system", content: localSystem(thinking, Boolean(request.ultra)) },
     ...messages({
       ...request,
       question,
@@ -169,11 +188,14 @@ export async function streamLocalChat(
         "x-api-key": config.apiKey.trim(),
       },
       body: JSON.stringify({
-        model: selected,
+        model: activeModel,
         stream: true,
         max_tokens: 8192,
         messages: conversation,
         tools: [CALCULATOR_TOOL],
+        ...(isDeepSeek(config)
+          ? { thinking: { type: thinking ? "enabled" : "disabled" } }
+          : {}),
       }),
       signal,
     });
@@ -238,7 +260,7 @@ export async function streamLocalChat(
     if (buffer.trim()) consume(buffer);
 
     if (toolCalls.size === 0 || finishReason !== "tool_calls") {
-      cb.onDone({ pipeline: "browser-local", model: selected });
+      cb.onDone({ pipeline: "browser-local", model: activeModel });
       return;
     }
 
