@@ -19,6 +19,7 @@ import {
 } from "../lib/sessionList";
 import { appendMarkdownDelta, uid } from "../lib/utils";
 import { prepareImageForVision } from "../lib/image";
+import { loadLocalApiConfig, saveLocalApiConfig, type LocalApiConfig } from "../lib/localConfig";
 import type { ApiMessage, ChatMessage, ModelOption, SkillId, ThinkingStep } from "../lib/types";
 
 export function useChat() {
@@ -27,6 +28,7 @@ export function useChat() {
   const [sessions, setSessions] = useState<SessionMeta[]>(loadSessionIndex);
   const [input, setInput] = useState("");
   const [image, setImage] = useState<string | null>(null);
+  const [localApiConfig, setLocalApiConfigState] = useState<LocalApiConfig>(loadLocalApiConfig);
   const [loading, setLoading] = useState(false);
   const [thinking, setThinking] = useState<ThinkingStep[]>([]);
   const [models, setModels] = useState<ModelOption[]>([]);
@@ -306,6 +308,7 @@ export function useChat() {
             model: selectedModel || undefined,
             skill: selectedSkill,
             ultra: ultraEnabled,
+            localConfig: localApiConfig.apiKey.trim() && localApiConfig.apiUrl.trim() ? localApiConfig : undefined,
           },
           makeStreamCallbacks(opts.patch),
           opts.signal
@@ -327,8 +330,13 @@ export function useChat() {
         }
       }
     },
-    [thinkingEnabled, selectedModel, selectedSkill, ultraEnabled, makeStreamCallbacks]
+    [thinkingEnabled, selectedModel, selectedSkill, ultraEnabled, localApiConfig, makeStreamCallbacks]
   );
+
+  const setLocalApiConfig = useCallback((config: LocalApiConfig) => {
+    setLocalApiConfigState(config);
+    saveLocalApiConfig(config);
+  }, []);
 
   const send = useCallback(async () => {
     const question = input.trim();
@@ -634,6 +642,8 @@ ${m.content}`.trim();
     setThinkingEnabled,
     ultraEnabled,
     setUltraEnabled,
+    localApiConfig,
+    setLocalApiConfig,
     models,
     selectedModel,
     setSelectedModel,

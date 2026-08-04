@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
-import { Bug, Check, ChevronDown, Link2, Loader2, LockKeyhole, PanelLeft, SquarePen } from "lucide-react";
+import { Bug, Check, ChevronDown, KeyRound, Link2, Loader2, LockKeyhole, PanelLeft, SquarePen, X } from "lucide-react";
 import { Composer } from "./components/Composer";
 import { ChatMessage } from "./components/ChatMessage";
 import { SessionDrawer } from "./components/SessionDrawer";
 import { useChat } from "./hooks/useChat";
+import type { LocalApiConfig } from "./lib/localConfig";
 
 const EXAMPLES = [
   "解方程 x²-5x+6=0，并说明使用了什么方法",
@@ -112,6 +113,7 @@ function ChatApp() {
   const [debug, setDebug] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [configOpen, setConfigOpen] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
   // Whether the user is pinned to the bottom of the message list. While
   // streaming, we only auto-scroll when they're already at/near the bottom,
@@ -220,19 +222,6 @@ function ChatApp() {
               <>
                 <button
                   type="button"
-                  onClick={chat.endContext}
-                  disabled={chat.contextEnded}
-                  title="点击后，下一道题不会带上之前对话的上下文"
-                  className={
-                    chat.contextEnded
-                      ? "flex h-8 shrink-0 items-center whitespace-nowrap rounded-lg bg-brand-500/10 px-2.5 text-xs font-medium text-brand-600"
-                      : "flex h-8 shrink-0 items-center whitespace-nowrap rounded-lg px-2.5 text-xs font-medium text-mute transition hover:bg-black/5 hover:text-ink"
-                  }
-                >
-                  {chat.contextEnded ? "已断开上下文" : "结束上下文"}
-                </button>
-                <button
-                  type="button"
                   onClick={chat.reset}
                   title="新对话"
                   aria-label="新对话"
@@ -242,6 +231,19 @@ function ChatApp() {
                 </button>
               </>
             )}
+            <button
+              type="button"
+              onClick={() => setConfigOpen(true)}
+              title="手动配置浏览器本地 API"
+              aria-label="手动配置浏览器本地 API"
+              className={
+                chat.localApiConfig.apiKey && chat.localApiConfig.apiUrl
+                  ? "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-500/10 text-brand-600 transition hover:bg-brand-500/20"
+                  : iconButton
+              }
+            >
+              <KeyRound className="h-4 w-4" />
+            </button>
             <button
               type="button"
               onClick={() => setDebug((value) => !value)}
@@ -345,6 +347,82 @@ function ChatApp() {
           setDrawerOpen(false);
         }}
       />
+      {configOpen && (
+        <ManualConfigDialog
+          value={chat.localApiConfig}
+          onSave={(value) => {
+            chat.setLocalApiConfig(value);
+            setConfigOpen(false);
+          }}
+          onClose={() => setConfigOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function ManualConfigDialog({
+  value,
+  onSave,
+  onClose,
+}: {
+  value: LocalApiConfig;
+  onSave: (value: LocalApiConfig) => void;
+  onClose: () => void;
+}) {
+  const [apiUrl, setApiUrl] = useState(value.apiUrl);
+  const [apiKey, setApiKey] = useState(value.apiKey);
+  const [showKey, setShowKey] = useState(false);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4" onMouseDown={onClose}>
+      <form
+        className="w-full max-w-md rounded-3xl border border-line bg-white p-6 shadow-2xl"
+        onMouseDown={(event) => event.stopPropagation()}
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSave({ apiUrl: apiUrl.trim(), apiKey: apiKey.trim() });
+        }}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">手动配置</h2>
+            <p className="mt-1 text-xs text-mute">配置后请求和 mathjs 计算均在浏览器本地运行</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg p-2 text-mute hover:bg-black/5" aria-label="关闭">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <label className="mt-5 block text-sm font-medium">
+          API URL
+          <input
+            value={apiUrl}
+            onChange={(event) => setApiUrl(event.target.value)}
+            placeholder="https://api.example.com 或 .../v1/chat/completions"
+            className="mt-2 w-full rounded-xl border border-line bg-cream px-3 py-2.5 font-mono text-xs outline-none focus:border-brand-500"
+          />
+        </label>
+        <label className="mt-4 block text-sm font-medium">
+          API Key
+          <div className="relative mt-2">
+            <input
+              type={showKey ? "text" : "password"}
+              value={apiKey}
+              onChange={(event) => setApiKey(event.target.value)}
+              placeholder="sk-…"
+              autoComplete="off"
+              className="w-full rounded-xl border border-line bg-cream px-3 py-2.5 pr-16 font-mono text-xs outline-none focus:border-brand-500"
+            />
+            <button type="button" onClick={() => setShowKey((current) => !current)} className="absolute right-2 top-1/2 -translate-y-1/2 px-2 text-xs text-mute hover:text-ink">
+              {showKey ? "隐藏" : "显示"}
+            </button>
+          </div>
+        </label>
+        <p className="mt-4 text-xs leading-5 text-faint">Key 只保存在本机 localStorage，不会提交到 EduVision 服务器。API 服务必须允许浏览器跨域请求。</p>
+        <div className="mt-6 flex justify-end gap-2">
+          <button type="button" onClick={() => onSave({ apiUrl: "", apiKey: "" })} className="rounded-xl px-3 py-2 text-sm text-red-500 hover:bg-red-50">清除配置</button>
+          <button type="submit" disabled={!apiUrl.trim() || !apiKey.trim()} className="rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50">保存并启用</button>
+        </div>
+      </form>
     </div>
   );
 }

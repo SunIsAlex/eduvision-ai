@@ -28,6 +28,7 @@ MyTokk Anthropic-compatible API → claude-sonnet-4-6
 - 可选 adaptive thinking 摘要。
 - 可选 Ultra 模式：高智力模型先规划解题思路，作答完成后由子代理复核最终答案的数值与代数结论，发现不一致时自动追加修正。
 - SSE 流式答案、工具调用卡片和原始响应调试面板。
+- 可选浏览器本地模式：通过“手动配置”填写 OpenAI 兼容 API URL/Key，SSE 和 mathjs calculator 均在浏览器本地运行，Key 不发送到本服务。
 - VPS 加固版 calculator 与浏览器 Web Worker JavaScript 沙箱。
 - 每个会话生成不可猜测的 URL，可跨设备恢复并分享调试。
 - Markdown、GFM、KaTeX 渲染，兼容多工具回合间相邻公式块。

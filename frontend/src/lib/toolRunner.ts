@@ -1,9 +1,10 @@
 /**
- * Browser-side execution for arbitrary JavaScript. Calculator runs in the VPS
- * Node process; JavaScript remains in a Web Worker (no DOM/page access) and is POSTed back to the
- * backend, which feeds it to the model and keeps streaming. 风险自负.
+ * Browser-side execution for calculator and arbitrary JavaScript. In manual
+ * API mode both tools stay in the browser; server mode still uses the backend
+ * calculator pipeline. JavaScript remains isolated in a Web Worker.
  */
 import type { ToolResult } from "./types";
+import { calc } from "./calc";
 
 const JS_TIMEOUT_MS = 15_000;
 const MAX_OUTPUT = 20_000;
@@ -17,6 +18,12 @@ export async function runTool(tool: { name: string; args: string }): Promise<Too
   }
 
   switch (tool.name) {
+    case "calculator":
+      try {
+        return { ok: true, output: calc(String(args.expression ?? "")) };
+      } catch (error) {
+        return { ok: false, output: error instanceof Error ? error.message : String(error) };
+      }
     case "javascript":
       return runJavaScript(String(args.code ?? ""));
     default:

@@ -1,5 +1,7 @@
 import type { ApiMessage, ModelOption, SkillId } from "./types";
 import { runTool } from "./toolRunner";
+import type { LocalApiConfig } from "./localConfig";
+import { streamLocalChat } from "./localStream";
 
 export interface StreamCallbacks {
   onDebug?: (event: string, data: Record<string, unknown>) => void;
@@ -43,10 +45,15 @@ export async function streamChat(
     model?: string;
     skill?: SkillId;
     ultra?: boolean;
+    localConfig?: LocalApiConfig;
   },
   callbacks: StreamCallbacks,
   signal?: AbortSignal
 ): Promise<void> {
+  if (request.localConfig?.apiKey.trim() && request.localConfig.apiUrl.trim()) {
+    await streamLocalChat(request, request.localConfig, callbacks, signal);
+    return;
+  }
   const res = await fetch("/api/chat/stream", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
