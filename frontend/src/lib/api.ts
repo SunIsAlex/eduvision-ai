@@ -3,6 +3,48 @@ import { runTool } from "./toolRunner";
 import type { LocalApiConfig } from "./localConfig";
 import { streamLocalChat } from "./localStream";
 
+function localModelsEndpoint(apiUrl: string): string {
+  const base = apiUrl.trim().replace(/\/$/, "");
+  if (/\/chat\/completions$/i.test(base)) return base.replace(/\/chat\/completions$/i, "/models");
+  return `${/\/v1$/i.test(base) ? base : `${base}/v1`}/models`;
+}
+
+function discoveredMultimodal(model: Record<string, unknown>): boolean {
+  const values = [model.modalities, model.input_modalities, model.inputModalities, model.capabilities]
+    .flatMap((value) => Array.isArray(value) ? value : typeof value === "object" && value ? Object.keys(value as object) : [])
+    .map((value) => String(value).toLowerCase());
+  if (values.some((value) => /image|vision|audio|multimodal/.test(value))) return true;
+  const id = String(model.id ?? "").toLowerCase();
+  return /vision|omni|4o|4\.1|sonnet|gemini|luna|sol/.test(id);
+}
+
+/** Discover models directly from a manually configured OpenAI-compatible API. */
+export async function fetchLocalModels(config: LocalApiConfig): Promise<{
+  models: ModelOption[];
+  defaultModel: string;
+}> {
+  const response = await fetch(localModelsEndpoint(config.apiUrl), {
+    headers: {
+      Authorization: `Bearer ${config.apiKey.trim()}`,
+      "x-api-key": config.apiKey.trim(),
+    },
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(`本地模型列表读取失败（${response.status}）`);
+  const body = (await response.json()) as { data?: unknown; models?: unknown };
+  const rows = Array.isArray(body.data) ? body.data : Array.isArray(body.models) ? body.models : [];
+  const models = rows
+    .filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && typeof (item as Record<string, unknown>).id === "string"))
+    .map((item) => ({
+      id: String(item.id),
+      displayName: String(item.name ?? item.id),
+      multimodal: discoveredMultimodal(item),
+    }));
+  if (models.length === 0) throw new Error("本地 API 没有返回可用模型");
+  const preferred = models.find((model) => model.multimodal) ?? models[0]!;
+  return { models, defaultModel: preferred.id };
+}
+
 export interface StreamCallbacks {
   onDebug?: (event: string, data: Record<string, unknown>) => void;
   onThinking: (text: string) => void;
@@ -46,6 +88,7 @@ export async function streamChat(
     skill?: SkillId;
     ultra?: boolean;
     localConfig?: LocalApiConfig;
+    availableModels?: ModelOption[];
   },
   callbacks: StreamCallbacks,
   signal?: AbortSignal

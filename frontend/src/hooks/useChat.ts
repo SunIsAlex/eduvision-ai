@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchModels, fetchTitle, streamChat, type StreamCallbacks } from "../lib/api";
+import { fetchLocalModels, fetchModels, fetchTitle, streamChat, type StreamCallbacks } from "../lib/api";
 import { loadMessages, removeSavedMessages, saveMessages } from "../lib/persist";
 import {
   createSessionId,
@@ -67,7 +67,8 @@ export function useChat() {
 
   useEffect(() => {
     let active = true;
-    void fetchModels()
+    const local = localApiConfig.apiKey.trim() && localApiConfig.apiUrl.trim() ? localApiConfig : null;
+    void (local ? fetchLocalModels(local) : fetchModels())
       .then((catalog) => {
         if (!active) return;
         setModels(catalog.models);
@@ -80,7 +81,7 @@ export function useChat() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [localApiConfig]);
 
   // URL 会话先用本地副本快速恢复，再用服务端快照校准，方便跨设备恢复和调试。
   useEffect(() => {
@@ -309,6 +310,7 @@ export function useChat() {
             skill: selectedSkill,
             ultra: ultraEnabled,
             localConfig: localApiConfig.apiKey.trim() && localApiConfig.apiUrl.trim() ? localApiConfig : undefined,
+            availableModels: models,
           },
           makeStreamCallbacks(opts.patch),
           opts.signal
@@ -330,7 +332,7 @@ export function useChat() {
         }
       }
     },
-    [thinkingEnabled, selectedModel, selectedSkill, ultraEnabled, localApiConfig, makeStreamCallbacks]
+    [thinkingEnabled, selectedModel, selectedSkill, ultraEnabled, localApiConfig, models, makeStreamCallbacks]
   );
 
   const setLocalApiConfig = useCallback((config: LocalApiConfig) => {

@@ -1,5 +1,5 @@
 import { runTool } from "./toolRunner";
-import type { ApiMessage } from "./types";
+import type { ApiMessage, ModelOption } from "./types";
 import type { LocalApiConfig } from "./localConfig";
 import type { StreamCallbacks } from "./api";
 
@@ -62,6 +62,57 @@ function localSystem(thinking: boolean, ultra: boolean): string {
   } 需要数值计算时调用 calculator 工具，工具结果来自浏览器本地 mathjs。`;
 }
 
+function imageModel(model: string | undefined, available: ModelOption[]): boolean {
+  const found = available.find((item) => item.id === model);
+  if (found) return found.multimodal === true;
+  return /vision|omni|4o|4\.1|sonnet|gemini|luna|sol/i.test(model ?? "");
+}
+
+function contentText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (!Array.isArray(value)) return "";
+  return value
+    .map((item) => (item && typeof item === "object" && "text" in item ? String(item.text ?? "") : ""))
+    .join("");
+}
+
+async function ocrImage(
+  config: LocalApiConfig,
+  model: string,
+  image: string,
+  signal?: AbortSignal
+): Promise<string> {
+  const response = await fetch(endpoint(config.apiUrl), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.apiKey.trim()}`,
+      "x-api-key": config.apiKey.trim(),
+    },
+    body: JSON.stringify({
+      model,
+      stream: false,
+      max_tokens: 2048,
+      messages: [
+        {
+          role: "system",
+          content: "请只做题目 OCR 复述：准确抄录图片中的文字、点名、下标、正负号、数字和几何关系，不要解题，不要猜测看不清的内容。",
+        },
+        {
+          role: "user",
+          content: [{ type: "image_url", image_url: { url: image, detail: "high" } }],
+        },
+      ],
+    }),
+    signal,
+  });
+  if (!response.ok) throw new Error(`OCR 请求失败（${response.status}）`);
+  const body = (await response.json()) as { choices?: Array<{ message?: { content?: unknown } }> };
+  const text = contentText(body.choices?.[0]?.message?.content);
+  if (!text.trim()) throw new Error("OCR 模型没有返回题目复述");
+  return text.trim();
+}
+
 /** Direct browser SSE for manually configured OpenAI-compatible endpoints. */
 export async function streamLocalChat(
   request: {
@@ -72,15 +123,41 @@ export async function streamLocalChat(
     thinking?: boolean;
     model?: string;
     ultra?: boolean;
+    availableModels?: ModelOption[];
   },
   config: LocalApiConfig,
   cb: StreamCallbacks,
   signal?: AbortSignal
 ): Promise<void> {
   const url = endpoint(config.apiUrl);
+  let question = request.question ?? "";
+  let image = request.image;
+  const available = request.availableModels ?? [];
+  const selected = request.model || "gpt-5.6-luna";
+  const vision = available.find((model) => model.multimodal && model.id !== selected)?.id;
+  if (image && vision && !imageModel(selected, available)) {
+    cb.onThinking(`正在使用 ${vision} 做题目 OCR 复述…`);
+    try {
+      const transcription = await ocrImage(config, vision, image, signal);
+      question = `${question}\n\n【图片题目 OCR 复述】\n${transcription}`.trim();
+      // The selected text-only model receives the verified transcription, not
+      // the image it cannot process. Historical images are omitted below too.
+      image = undefined;
+    } catch (error) {
+      cb.onError(error instanceof Error ? error.message : "图片 OCR 失败");
+      return;
+    }
+  }
   const conversation: OpenAIMessage[] = [
     { role: "system", content: localSystem(Boolean(request.thinking), Boolean(request.ultra)) },
-    ...messages(request),
+    ...messages({
+      ...request,
+      question,
+      image,
+      history: imageModel(selected, available)
+        ? request.history
+        : request.history.map((item) => ({ ...item, image: undefined })),
+    }),
   ];
 
   for (let round = 0; round < 4; round++) {
@@ -92,7 +169,7 @@ export async function streamLocalChat(
         "x-api-key": config.apiKey.trim(),
       },
       body: JSON.stringify({
-        model: request.model || "gpt-5.6-luna",
+        model: selected,
         stream: true,
         max_tokens: 8192,
         messages: conversation,
@@ -161,7 +238,7 @@ export async function streamLocalChat(
     if (buffer.trim()) consume(buffer);
 
     if (toolCalls.size === 0 || finishReason !== "tool_calls") {
-      cb.onDone({ pipeline: "browser-local", model: request.model || "gpt-5.6-luna" });
+      cb.onDone({ pipeline: "browser-local", model: selected });
       return;
     }
 

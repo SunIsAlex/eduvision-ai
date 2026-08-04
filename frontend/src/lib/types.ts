@@ -53,6 +53,8 @@ export interface ThinkingStep {
 export interface ModelOption {
   id: string;
   displayName: string;
+  /** Known to accept image input when discovered from a local provider. */
+  multimodal?: boolean;
 }
 
 export type SkillId = "general" | "math" | "chemistry";
