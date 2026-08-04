@@ -110,7 +110,7 @@ export function Composer(props: Props) {
             className="bg-transparent text-[#d1d1d1] outline-none disabled:opacity-50"
             title="由你选择本轮及后续对话使用的学科规范"
           >
-            <option value="general" className="bg-[#2f2f2f]">通用 SKILL</option>
+            <option value="general" className="bg-[#2f2f2f]">无 SKILL</option>
             <option value="math" className="bg-[#2f2f2f]">数学 SKILL</option>
             <option value="chemistry" className="bg-[#2f2f2f]">化学 SKILL</option>
           </select>
