@@ -191,7 +191,10 @@ export async function streamLocalChat(
       body: JSON.stringify({
         model: activeModel,
         stream: true,
-        max_tokens: 8192,
+        // DeepSeek counts reasoning_content against the same output budget.
+        // Complex homework can otherwise spend the whole 8k budget thinking
+        // and terminate with finish_reason=length before emitting content.
+        max_tokens: thinking && !forceFormalAnswer ? 32768 : 8192,
         messages: conversation,
         tools: [CALCULATOR_TOOL],
         ...(isDeepSeek(config)
@@ -260,14 +263,42 @@ export async function streamLocalChat(
     }
     if (buffer.trim()) consume(buffer);
 
+    cb.onDebug?.("local_round", {
+      model: activeModel,
+      finishReason,
+      reasoningChars: reasoning.length,
+      contentChars: content.length,
+      thinking: thinking && !forceFormalAnswer,
+    });
+
     if (toolCalls.size === 0 || finishReason !== "tool_calls") {
-      if (thinking && !forceFormalAnswer && !content.trim() && reasoning.trim()) {
+      if (
+        thinking &&
+        !forceFormalAnswer &&
+        reasoning.trim() &&
+        (!content.trim() || finishReason === "length")
+      ) {
         forceFormalAnswer = true;
-        cb.onThinking("思考完成，正在请求正式答案…");
-        conversation.push({ role: "assistant", content: "", reasoning_content: reasoning });
+        cb.onThinking(
+          finishReason === "length"
+            ? "思考输出达到长度上限，正在依据已有推理完成答案…"
+            : "思考完成，正在依据已有推理生成正式答案…"
+        );
+        // DeepSeek documents that reasoning_content from a no-tool turn may be
+        // ignored in later requests. Put the completed reasoning into ordinary
+        // assistant content so the non-thinking completion must condition on
+        // it instead of solving again from scratch.
+        conversation.push({
+          role: "assistant",
+          content: content.trim()
+            ? `【上一轮分析】\n${reasoning}\n\n【已输出的答案片段】\n${content}`
+            : `【上一轮分析】\n${reasoning}`,
+        });
         conversation.push({
           role: "user",
-          content: "思考已经完成。现在只输出给用户看的正式答案和必要的关键推导，不要输出思维链，不要省略最终结论。",
+          content: content.trim()
+            ? "请严格依据上面的分析继续完成正式答案，只输出尚未完成的部分，不要重复已有答案片段，不要省略最终结论。"
+            : "请严格依据上面的分析整理成给用户看的正式答案，保留必要关键推导和最终结论，不要重新求解，不要输出思维链。",
         });
         continue;
       }
