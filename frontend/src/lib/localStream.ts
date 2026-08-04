@@ -5,6 +5,15 @@ import type { StreamCallbacks } from "./api";
 
 type OpenAIMessage = Record<string, unknown>;
 
+// Stop a runaway visible CoT before it consumes the provider's entire output
+// allowance. The follow-up answer has its own fresh output budget.
+const LOCAL_REASONING_TOKEN_LIMIT = 16_000;
+
+function estimateTokens(text: string): number {
+  const cjk = text.match(/[\u3400-\u9fff\uf900-\ufaff]/g)?.length ?? 0;
+  return cjk + Math.ceil((text.length - cjk) / 4);
+}
+
 const CALCULATOR_TOOL = {
   type: "function",
   function: {
@@ -220,6 +229,7 @@ export async function streamLocalChat(
     let content = "";
     let reasoning = "";
     let finishReason = "";
+    let reasoningCutOff = false;
     const toolCalls = new Map<number, { id: string; name: string; args: string }>();
 
     const consume = (raw: string) => {
@@ -264,13 +274,28 @@ export async function streamLocalChat(
       const lines = buffer.split(/\r?\n/);
       buffer = lines.pop() ?? "";
       for (const line of lines) consume(line);
+      if (
+        thinking &&
+        !forceFormalAnswer &&
+        !content.trim() &&
+        estimateTokens(reasoning) >= LOCAL_REASONING_TOKEN_LIMIT
+      ) {
+        reasoningCutOff = true;
+        finishReason = "reasoning_budget";
+        buffer = "";
+        // Cancel only this upstream response. Do not abort the shared signal,
+        // because the immediate non-thinking completion must keep using it.
+        await reader.cancel("reasoning budget reached").catch(() => undefined);
+        break;
+      }
     }
-    if (buffer.trim()) consume(buffer);
+    if (!reasoningCutOff && buffer.trim()) consume(buffer);
 
     cb.onDebug?.("local_round", {
       model: activeModel,
       finishReason,
       reasoningChars: reasoning.length,
+      estimatedReasoningTokens: estimateTokens(reasoning),
       contentChars: content.length,
       thinking: thinking && !forceFormalAnswer,
     });
@@ -280,12 +305,14 @@ export async function streamLocalChat(
         thinking &&
         !forceFormalAnswer &&
         reasoning.trim() &&
-        (!content.trim() || finishReason === "length")
+        (!content.trim() || finishReason === "length" || finishReason === "reasoning_budget")
       ) {
         forceFormalAnswer = true;
         cb.onThinking(
-          finishReason === "length"
-            ? "思考输出达到长度上限，正在依据已有推理完成答案…"
+          finishReason === "reasoning_budget"
+            ? "思考已达到预算，正在暂停思考并依据已有推理直接作答…"
+            : finishReason === "length"
+              ? "思考输出达到长度上限，正在依据已有推理完成答案…"
             : "思考完成，正在依据已有推理生成正式答案…"
         );
         // DeepSeek documents that reasoning_content from a no-tool turn may be
