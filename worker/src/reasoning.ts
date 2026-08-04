@@ -1015,6 +1015,24 @@ export async function* streamAnswer(
 
     // No tool calls: the answer is complete.
     if (roundResult.toolCalls.length === 0) {
+      // Some OpenAI-compatible relays return only reasoning_content when
+      // thinking is enabled. Do not finish with a visible thinking panel and
+      // an empty answer; ask once for the user-facing solution explicitly.
+      if (
+        roundResult.content.trim() === "" &&
+        roundResult.reasoning.trim() !== "" &&
+        corrections < MAX_CORRECTIONS
+      ) {
+        corrections += 1;
+        yield { kind: "status", text: "模型只返回了思考内容，正在重新请求正式解答…" };
+        messages.push({
+          role: "user",
+          content:
+            "上一轮只返回了思考/分析，没有返回给用户看的正式解答。请立即重新输出完整、可检查的正式答案；" +
+            "不要输出思维链、不要只写分析过程，数学题必须给出最终结果和关键推导。",
+        });
+        continue;
+      }
       if (roundResult.content.trim() !== "") {
         // 防虚构：解答声称调用了计算器，但整个请求没有任何真实 tool_call 时，
         // 追加一轮纠正，要求模型真实调用 calculator 后重新作答。
