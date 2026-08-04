@@ -312,6 +312,7 @@ export function useChat({ guestMode = false }: { guestMode?: boolean } = {}) {
       image?: string;
       history: ApiMessage[];
       patch: (fn: (m: ChatMessage) => ChatMessage) => void;
+      onOcrResult?: (text: string) => void;
       signal?: AbortSignal;
       /** 非中止的网络错误：true 时显示错误消息，false 时保留已有内容回到暂停态。 */
       failAsError: boolean;
@@ -332,6 +333,8 @@ export function useChat({ guestMode = false }: { guestMode?: boolean } = {}) {
         const requestImage = opts.image
           ? await prepareImageForVision(opts.image).catch(() => opts.image)
           : undefined;
+        const callbacks = makeStreamCallbacks(opts.patch);
+        callbacks.onOcrResult = opts.onOcrResult;
         await streamChat(
           {
             requestId: opts.requestId,
@@ -345,7 +348,7 @@ export function useChat({ guestMode = false }: { guestMode?: boolean } = {}) {
             localConfig: localApiConfig.apiKey.trim() && localApiConfig.apiUrl.trim() ? localApiConfig : undefined,
             availableModels: models,
           },
-          makeStreamCallbacks(opts.patch),
+          callbacks,
           opts.signal
         );
       } catch (err) {
@@ -424,6 +427,14 @@ export function useChat({ guestMode = false }: { guestMode?: boolean } = {}) {
         image: image ?? undefined,
         history,
         patch,
+        onOcrResult: (text) =>
+          setMessages((prev) =>
+            prev.map((message) =>
+              message.id === userMessage.id
+                ? { ...message, content: text, ocrGenerated: true }
+                : message
+            )
+          ),
         signal: controller.signal,
         failAsError: true,
       });
@@ -593,7 +604,10 @@ export function useChat({ guestMode = false }: { guestMode?: boolean } = {}) {
         await runStream({
           requestId,
           question: content,
-          image: target.image,
+          // Once OCR text is visible and editable, a corrected transcription
+          // is the source of truth. Keep displaying the original image, but do
+          // not OCR it again and overwrite the user's corrections.
+          image: target.ocrGenerated ? undefined : target.image,
           history,
           patch,
           signal: controller.signal,

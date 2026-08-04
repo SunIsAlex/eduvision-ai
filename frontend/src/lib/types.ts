@@ -15,6 +15,8 @@ export interface ChatMessage {
   /** Tool calls made while producing this answer (assistant only). */
   tools?: ToolActivity[];
   image?: string;
+  /** User text was populated from browser-local OCR; edits should not rerun OCR. */
+  ocrGenerated?: boolean;
   /** Pipeline that produced this answer (set on completion). */
   pipeline?: string;
   model?: string;

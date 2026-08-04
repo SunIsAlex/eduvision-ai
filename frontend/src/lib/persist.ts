@@ -23,6 +23,7 @@ function normalize(m: unknown): ChatMessage | null {
     ...(Array.isArray(msg.lineChecks) ? { lineChecks: msg.lineChecks } : {}),
     ...(Array.isArray(msg.tools) ? { tools: msg.tools } : {}),
     ...(typeof msg.image === "string" ? { image: msg.image } : {}),
+    ...(typeof msg.ocrGenerated === "boolean" ? { ocrGenerated: msg.ocrGenerated } : {}),
     ...(typeof msg.pipeline === "string" ? { pipeline: msg.pipeline } : {}),
     ...(typeof msg.model === "string" ? { model: msg.model } : {}),
     ...(typeof msg.error === "boolean" ? { error: msg.error } : {}),

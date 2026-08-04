@@ -168,7 +168,9 @@ export async function streamLocalChat(
     cb.onThinking(`正在使用 ${vision} 做题目 OCR 复述…`);
     try {
       const transcription = await ocrImage(config, vision, image, signal);
-      question = `${question}\n\n【图片题目 OCR 复述】\n${transcription}`.trim();
+      question = `${question}\n\n${transcription}`.trim();
+      cb.onOcrResult?.(question);
+      cb.onDebug?.("local_ocr", { model: vision, text: transcription });
       // The selected text-only model receives the verified transcription, not
       // the image it cannot process. Historical images are omitted below too.
       image = undefined;

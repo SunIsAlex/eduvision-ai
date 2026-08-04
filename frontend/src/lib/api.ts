@@ -47,6 +47,7 @@ export async function fetchLocalModels(config: LocalApiConfig): Promise<{
 
 export interface StreamCallbacks {
   onDebug?: (event: string, data: Record<string, unknown>) => void;
+  onOcrResult?: (text: string) => void;
   onThinking: (text: string) => void;
   onPlan: (delta: string) => void;
   onVerify: (delta: string) => void;
