@@ -13,10 +13,20 @@ const EXAMPLES = [
 ];
 
 export default function App() {
-  const [authState, setAuthState] = useState<"checking" | "locked" | "open">("checking");
+  const [authState, setAuthState] = useState<"checking" | "locked" | "open" | "guest">("checking");
 
   useEffect(() => {
     let active = true;
+    try {
+      if (window.sessionStorage.getItem("eduvision-guest-mode") === "true") {
+        setAuthState("guest");
+        return () => {
+          active = false;
+        };
+      }
+    } catch {
+      // Session storage is optional.
+    }
     void fetch("/api/auth/status", { cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) throw new Error("鉴权状态读取失败");
@@ -40,11 +50,32 @@ export default function App() {
       </div>
     );
   }
-  if (authState === "locked") return <LoginScreen onSuccess={() => setAuthState("open")} />;
-  return <ChatApp />;
+  if (authState === "locked") {
+    return (
+      <LoginScreen
+        onSuccess={() => {
+          try { window.sessionStorage.removeItem("eduvision-guest-mode"); } catch { /* ignore */ }
+          setAuthState("open");
+        }}
+        onGuest={() => {
+          try { window.sessionStorage.setItem("eduvision-guest-mode", "true"); } catch { /* ignore */ }
+          setAuthState("guest");
+        }}
+      />
+    );
+  }
+  return (
+    <ChatApp
+      guestMode={authState === "guest"}
+      onExitGuest={() => {
+        try { window.sessionStorage.removeItem("eduvision-guest-mode"); } catch { /* ignore */ }
+        setAuthState("locked");
+      }}
+    />
+  );
 }
 
-function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
+function LoginScreen({ onSuccess, onGuest }: { onSuccess: () => void; onGuest: () => void }) {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -103,17 +134,31 @@ function LoginScreen({ onSuccess }: { onSuccess: () => void }) {
           {loading && <Loader2 className="h-4 w-4 animate-spin" />}
           进入
         </button>
+        <div className="my-4 flex items-center gap-3 text-xs text-faint">
+          <span className="h-px flex-1 bg-line" />
+          没有密码
+          <span className="h-px flex-1 bg-line" />
+        </div>
+        <button
+          type="button"
+          disabled={loading}
+          onClick={onGuest}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-line px-4 py-3 text-sm font-semibold text-mute transition hover:border-brand-500/50 hover:bg-brand-50 hover:text-brand-600 disabled:opacity-50"
+        >
+          进入访客模式
+        </button>
+        <p className="mt-3 text-center text-xs leading-5 text-faint">访客模式只能使用浏览器本地手动 API 配置</p>
       </form>
     </div>
   );
 }
 
-function ChatApp() {
-  const chat = useChat();
+function ChatApp({ guestMode = false, onExitGuest }: { guestMode?: boolean; onExitGuest?: () => void }) {
+  const chat = useChat({ guestMode });
   const [debug, setDebug] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [configOpen, setConfigOpen] = useState(false);
+  const [configOpen, setConfigOpen] = useState(guestMode);
   const mainRef = useRef<HTMLElement>(null);
   // Whether the user is pinned to the bottom of the message list. While
   // streaming, we only auto-scroll when they're already at/near the bottom,
@@ -218,6 +263,16 @@ function ChatApp() {
             <ChevronDown className="h-3.5 w-3.5 shrink-0 text-faint" />
           </label>
           <div className="ml-auto flex items-center gap-0.5">
+            {guestMode && (
+              <button
+                type="button"
+                onClick={onExitGuest}
+                title="退出访客模式并返回登录"
+                className="mr-1 rounded-full bg-amber-100 px-2 py-1 text-[11px] font-medium text-amber-700 transition hover:bg-amber-200"
+              >
+                访客
+              </button>
+            )}
             {chat.messages.length > 0 && (
               <>
                 <button
@@ -324,6 +379,7 @@ function ChatApp() {
         onSubmit={() => void chat.send()}
         onStop={chat.stop}
         loading={chat.loading}
+        disabled={guestMode && (!chat.localApiConfig.apiKey || !chat.localApiConfig.apiUrl)}
         thinkingEnabled={chat.thinkingEnabled}
         onThinkingEnabledChange={chat.setThinkingEnabled}
         ultraEnabled={chat.ultraEnabled}

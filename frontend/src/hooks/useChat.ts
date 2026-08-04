@@ -22,7 +22,7 @@ import { prepareImageForVision } from "../lib/image";
 import { loadLocalApiConfig, saveLocalApiConfig, type LocalApiConfig } from "../lib/localConfig";
 import type { ApiMessage, ChatMessage, ModelOption, SkillId, ThinkingStep } from "../lib/types";
 
-export function useChat() {
+export function useChat({ guestMode = false }: { guestMode?: boolean } = {}) {
   const [sessionId, setSessionId] = useState(getOrCreateSessionId);
   const [messages, setMessages] = useState<ChatMessage[]>(() => loadMessages(sessionId));
   const [sessions, setSessions] = useState<SessionMeta[]>(loadSessionIndex);
@@ -68,6 +68,15 @@ export function useChat() {
   useEffect(() => {
     let active = true;
     const local = localApiConfig.apiKey.trim() && localApiConfig.apiUrl.trim() ? localApiConfig : null;
+    if (guestMode && !local) {
+      setModels([]);
+      setSelectedModel("");
+      setModelsLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+    setModelsLoading(true);
     void (local ? fetchLocalModels(local) : fetchModels())
       .then((catalog) => {
         if (!active) return;
@@ -81,7 +90,7 @@ export function useChat() {
     return () => {
       active = false;
     };
-  }, [localApiConfig]);
+  }, [localApiConfig, guestMode]);
 
   // URL 会话先用本地副本快速恢复，再用服务端快照校准，方便跨设备恢复和调试。
   useEffect(() => {
@@ -89,6 +98,12 @@ export function useChat() {
     setSessionReady(false);
     setMessages(loadMessages(sessionId));
     setContextBreak(0);
+    if (guestMode) {
+      setSessionReady(true);
+      return () => {
+        active = false;
+      };
+    }
     void loadRemoteSession(sessionId)
       .then((snapshot) => {
         if (!active || !snapshot) return;
@@ -103,7 +118,7 @@ export function useChat() {
     return () => {
       active = false;
     };
-  }, [sessionId]);
+  }, [sessionId, guestMode]);
 
   // 只保存完整回合，避免 URL 恢复出半截回答。
   useEffect(() => {
@@ -117,10 +132,12 @@ export function useChat() {
     if (messages.length > 0) {
       setSessions((prev) => persistSessionIndex(upsertSession(prev, sessionId)));
     }
-    void saveRemoteSession(sessionId, { messages, contextBreak }).catch((error) =>
-      console.warn("[session] save failed:", error)
-    );
-  }, [messages, contextBreak, sessionId, sessionReady]);
+    if (!guestMode) {
+      void saveRemoteSession(sessionId, { messages, contextBreak }).catch((error) =>
+        console.warn("[session] save failed:", error)
+      );
+    }
+  }, [messages, contextBreak, sessionId, sessionReady, guestMode]);
 
   // 首个完整回答落盘后，让模型为会话生成一个简短标题；失败时回退到首条问题截断。
   useEffect(() => {
@@ -140,6 +157,10 @@ export function useChat() {
       setSessions((prev) =>
         persistSessionIndex(renameSession(prev, sessionId, title || fallback))
       );
+    if (guestMode) {
+      apply("");
+      return;
+    }
     void fetchTitle({
       question,
       answer: firstAnswer.content.slice(0, 800),
@@ -150,7 +171,7 @@ export function useChat() {
         console.warn("[session] title generation failed:", error);
         apply("");
       });
-  }, [messages, sessionId, sessionReady, sessions, selectedModel]);
+  }, [messages, sessionId, sessionReady, sessions, selectedModel, guestMode]);
 
   useEffect(() => {
     try {
@@ -296,6 +317,18 @@ export function useChat() {
       failAsError: boolean;
     }) => {
       try {
+        if (
+          guestMode &&
+          (!localApiConfig.apiKey.trim() || !localApiConfig.apiUrl.trim())
+        ) {
+          opts.patch((message) => ({
+            ...message,
+            content: "访客模式需要先完成手动 API 配置。",
+            error: true,
+            status: "error",
+          }));
+          return;
+        }
         const requestImage = opts.image
           ? await prepareImageForVision(opts.image).catch(() => opts.image)
           : undefined;
@@ -332,7 +365,7 @@ export function useChat() {
         }
       }
     },
-    [thinkingEnabled, selectedModel, selectedSkill, ultraEnabled, localApiConfig, models, makeStreamCallbacks]
+    [thinkingEnabled, selectedModel, selectedSkill, ultraEnabled, localApiConfig, models, guestMode, makeStreamCallbacks]
   );
 
   const setLocalApiConfig = useCallback((config: LocalApiConfig) => {
@@ -452,12 +485,14 @@ export function useChat() {
     (targetId: string) => {
       setSessions((prev) => persistSessionIndex(removeSession(prev, targetId)));
       removeSavedMessages(targetId);
-      void deleteRemoteSession(targetId).catch((error) =>
-        console.warn("[session] remote delete failed:", error)
-      );
+      if (!guestMode) {
+        void deleteRemoteSession(targetId).catch((error) =>
+          console.warn("[session] remote delete failed:", error)
+        );
+      }
       if (targetId === sessionId) reset();
     },
-    [sessionId, reset]
+    [sessionId, reset, guestMode]
   );
 
   /** 修改模型输出（所有回答都可编辑，用于纠正笔误）。仅改本地内容。 */

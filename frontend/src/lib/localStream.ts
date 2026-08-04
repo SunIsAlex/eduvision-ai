@@ -231,6 +231,10 @@ export async function streamLocalChat(
       } catch {
         return;
       }
+      // Keep the original provider chunk available in the existing debug JSON
+      // panel. It contains model/finish_reason/reasoning_content/content but no
+      // API credentials or request headers.
+      cb.onDebug?.("local_sse", chunk as Record<string, unknown>);
       const choice = chunk.choices?.[0];
       const delta = choice?.delta;
       if (typeof delta?.content === "string") {
