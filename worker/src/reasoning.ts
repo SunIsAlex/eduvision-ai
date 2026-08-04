@@ -12,7 +12,8 @@ import {
 import { TOOL_EXECUTORS, TOOL_DEFINITIONS } from "./tools";
 import { awaitBrowserToolResult } from "./toolbridge";
 import { executeServerTool } from "./server-tools";
-import { MODELS, type ChatMessage, type Env } from "./types";
+import { readFile } from "node:fs/promises";
+import { MODELS, type ChatMessage, type Env, type SkillId } from "./types";
 
 const TEACHER_SYSTEM = `你是一位严谨、简洁的中学教师。目标是在保证正确和易懂的前提下，用最少的必要推理解决学生的问题。
 
@@ -26,13 +27,7 @@ const TEACHER_SYSTEM = `你是一位严谨、简洁的中学教师。目标是�
 7. 一次工具调用能完成时不要拆成多轮。工具失败时最多修正重试一次，仍失败才改为直接推导或说明限制。
 8. 严禁虚构工具调用。只有真实调用并拿到结果后，才可以写“工具验证”或引用工具结果；纯符号推导、公式变形和概念解释不调用工具。
 9. 默认使用中文、Markdown 和 LaTeX（行内 $...$，独立行 $$...$$）。避免固定套话和过度分段；结论要明确。英文题保留必要的英文术语并用中文解释。
-10. 若用户明确要求详细推导、证明、所有情况或指定工具，则服从该要求，但仍避免重复内容。
-11. 数值求解输出前必须做通用一致性检查：正文方程、工具代码和验证式必须一致；重新枚举守恒式涉及的全部物种或变量，逐项代回并报告以主要量级为分母的相对残差（理论残差为 0 时禁止除以 0）。任一关键相对残差大于 1e-6、左右两边明显不等或量纲不一致时，必须修正后重算，不能宣称结果可靠。
-12. 复杂方程优先代数消元并降为单变量有界求根；确实无法降维才使用带物理约束、阻尼和收敛检查的多元算法。一次 javascript 应同时输出结果和全部关键残差；若已用完整精度验证通过，calculator 最多做 1～2 个独立抽查，不重复计算由定义直接得到的量。
-13. 使用单调性、凹凸性、Jensen、切线法或“对称性取等”前，必须做一次短验证：写出相关导数或等价判据，在题目的完整实际区间内检查符号；若导数变号就分段处理或换方法。对称只能提出候选点，不能证明它是全局最值；还必须排除边界和其他驻点。绝不凭熟悉印象宣称函数在整段上单调、凸或凹。
-14. 最终答案只保留一条已经闭合且逐步有效的证明。输出前用一遍简短反向审查确认：每个定理的前提覆盖完整定义域、每个不等号方向正确、等号条件可实现，且正文没有重新采用思考过程中已被否定的论证。发现关键步骤无效就先修正；不要用数值试验或“看起来对称”掩盖证明缺口。完成这次检查后立即作答，不继续寻找第二种解法。
-15. 用户明确要求画图，或函数图像能明显帮助理解时，可以调用 function_plot 附加交互图像。必须先用导数、代数或数值工具确定结论；图像只能演示，不能作为零点、单调性、凹凸性或最值的证明。不要为简单算术或图像无助于理解的题目绘图。
-16. 对正实数不等式、精确最值及证明题，优先使用中学课程范围内的代数变形、基本不等式、柯西不等式、均值不等式或换元完成严格证明。不得用随机搜索、有限采样或数值逼近代替全局证明；数值工具只能用于发现候选结论或检查等号点，且找到简短解析证明后不应再调用。题目要求求最值时，必须证明相应的下界或上界并验证等号能够取得，不能只输出数值搜索结果。`;
+10. 若用户明确要求详细推导、证明、所有情况或指定工具，则服从该要求，但仍避免重复内容。用户选择了学科 SKILL 时，严格遵守附加的学科规范。`;
 
 const DIRECT_TEACHER_SYSTEM = `你是一位严谨、简洁的中学教师。当前是直答模式：立即回答，不展示思考过程、计划、自我检查或重复总结。
 
@@ -40,8 +35,23 @@ const DIRECT_TEACHER_SYSTEM = `你是一位严谨、简洁的中学教师。当�
 1. 简单题直接给结论；普通题只给必要公式和关键步骤；证明题给一条闭合的中学范围证明。默认中文、Markdown、LaTeX。
 2. 图片题只提取解题必需的信息；看不清就指出，不猜测题目出处、年份或难度。
 3. 必须服从请求中附加的工具执行要求。需要数值计算时尽快调用 calculator；非线性方程、联立平衡或迭代问题调用 javascript。拿到工具结果后直接作答，不重复手算，不虚构工具结果。
-4. 单调性、凹凸性、切线法或对称最值必须先用导数或等价判据核对完整区间；精确最值必须证明界并验证等号，不能用采样代替证明。
-5. 数值解必须检查代回残差、守恒关系和量纲；关键相对残差超过 1e-6 就修正。得出可靠结论后立即停止。`;
+4. 用户选择了学科 SKILL 时，严格遵守附加的学科规范。得出可靠结论后立即停止。`;
+
+const SKILL_FILES: Partial<Record<SkillId, URL>> = {
+  math: new URL("../prompts/math/SKILL.md", import.meta.url),
+  chemistry: new URL("../prompts/chemistry/SKILL.md", import.meta.url),
+};
+const skillPromptCache = new Map<SkillId, Promise<string>>();
+
+function loadSkillPrompt(skill: SkillId): Promise<string> {
+  const file = SKILL_FILES[skill];
+  if (!file) return Promise.resolve("");
+  const cached = skillPromptCache.get(skill);
+  if (cached) return cached;
+  const loading = readFile(file, "utf8").then((content) => `\n\n${content.trim()}`);
+  skillPromptCache.set(skill, loading);
+  return loading;
+}
 
 const MAX_TOOL_ROUNDS = 3;
 const MAX_CORRECTIONS = 1;
@@ -190,10 +200,13 @@ export async function* streamAnswer(
     model?: string;
     requestId?: string;
     thinking?: boolean;
+    skill?: SkillId;
   }
 ): AsyncGenerator<StreamDelta, void, unknown> {
   const model = input.model ?? MODELS.VISION;
   const requestId = input.requestId ?? "local";
+  const skill = input.skill ?? "general";
+  const skillPrompt = await loadSkillPrompt(skill);
   const directExpression = !input.image
     ? directCalculatorExpression(input.question)
     : null;
@@ -241,7 +254,7 @@ export async function* streamAnswer(
   const usedTools = new Set<string>();
   let corrections = 0;
   console.log(
-    `[request] ${requestId} model=${model} thinking=${input.thinking === true} requiredTools=${[javascriptRequired && "javascript", calculatorRequired && "calculator", functionPlotRequired && "function_plot"].filter(Boolean).join(",") || "none"} image=${Boolean(input.image)} history=${input.history?.length ?? 0} historyImages=${input.history?.filter((message) => Boolean(message.image)).length ?? 0} question=${input.question.slice(0, 120)}`
+    `[request] ${requestId} model=${model} skill=${skill} thinking=${input.thinking === true} requiredTools=${[javascriptRequired && "javascript", calculatorRequired && "calculator", functionPlotRequired && "function_plot"].filter(Boolean).join(",") || "none"} image=${Boolean(input.image)} history=${input.history?.length ?? 0} historyImages=${input.history?.filter((message) => Boolean(message.image)).length ?? 0} question=${input.question.slice(0, 120)}`
   );
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
@@ -267,7 +280,7 @@ export async function* streamAnswer(
     const params: MessageCreateParamsStreaming = {
       model,
       max_tokens: input.thinking ? MAX_ANSWER_TOKENS + 2048 : MAX_ANSWER_TOKENS,
-      system: input.thinking ? TEACHER_SYSTEM : DIRECT_TEACHER_SYSTEM,
+      system: (input.thinking ? TEACHER_SYSTEM : DIRECT_TEACHER_SYSTEM) + skillPrompt,
       stream: true,
       messages,
       tools,

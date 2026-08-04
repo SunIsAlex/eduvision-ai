@@ -30,6 +30,7 @@ MyTokk Anthropic-compatible API → claude-sonnet-4-6
 - VPS 加固版 calculator 与浏览器 Web Worker JavaScript 沙箱。
 - 每个会话生成不可猜测的 URL，可跨设备恢复并分享调试。
 - Markdown、GFM、KaTeX 渲染，兼容多工具回合间相邻公式块。
+- 用户可显式选择通用、数学或化学 SKILL；学科提示词按需从 `worker/prompts/*/SKILL.md` 加载。
 
 ## 本地开发
 
@@ -91,7 +92,7 @@ sudo /usr/local/sbin/openclaw-eduvision-root status
 
 ## API
 
-- `POST /api/chat/stream`：SSE 对话流。
+- `POST /api/chat/stream`：SSE 对话流，可传 `skill=general|math|chemistry`。
 - `POST /api/tool/result`：浏览器回传工具结果。
 - `POST /api/upload`：压缩图片转为 data URL。
 - `GET|PUT /api/sessions/:uuid`：读取或保存 URL 会话。

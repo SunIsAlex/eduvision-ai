@@ -9,7 +9,7 @@ import {
   saveRemoteSession,
 } from "../lib/session";
 import { appendMarkdownDelta, uid } from "../lib/utils";
-import type { ChatMessage, ModelOption, ThinkingStep } from "../lib/types";
+import type { ChatMessage, ModelOption, SkillId, ThinkingStep } from "../lib/types";
 
 export function useChat() {
   const [sessionId, setSessionId] = useState(getOrCreateSessionId);
@@ -21,6 +21,14 @@ export function useChat() {
   const [models, setModels] = useState<ModelOption[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
   const [modelsLoading, setModelsLoading] = useState(true);
+  const [selectedSkill, setSelectedSkill] = useState<SkillId>(() => {
+    try {
+      const saved = window.localStorage.getItem("eduvision-selected-skill");
+      return saved === "math" || saved === "chemistry" ? saved : "general";
+    } catch {
+      return "general";
+    }
+  });
   const [thinkingEnabled, setThinkingEnabled] = useState(() => {
     try {
       return window.localStorage.getItem("eduvision-thinking-enabled") === "true";
@@ -94,6 +102,14 @@ export function useChat() {
     }
   }, [thinkingEnabled]);
 
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("eduvision-selected-skill", selectedSkill);
+    } catch {
+      // Storage may be unavailable in private or restricted browser contexts.
+    }
+  }, [selectedSkill]);
+
   const send = useCallback(async () => {
     const question = input.trim();
     if ((!question && !image) || loading) return;
@@ -146,6 +162,7 @@ export function useChat() {
           history,
           thinking: thinkingEnabled,
           model: selectedModel || undefined,
+          skill: selectedSkill,
         },
         {
           onDebug: (event, data) =>
@@ -242,7 +259,7 @@ export function useChat() {
       setLoading(false);
       setThinking([]);
     }
-  }, [input, image, loading, messages, contextBreak, thinkingEnabled, selectedModel]);
+  }, [input, image, loading, messages, contextBreak, thinkingEnabled, selectedModel, selectedSkill]);
 
   /** 结束当前上下文：断点设在现有对话末尾，下一道题不带前面的上下文。 */
   const endContext = useCallback(() => {
@@ -283,6 +300,8 @@ export function useChat() {
     selectedModel,
     setSelectedModel,
     modelsLoading,
+    selectedSkill,
+    setSelectedSkill,
     contextEnded: contextBreak > 0,
     endContext,
     send,

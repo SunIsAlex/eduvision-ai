@@ -20,6 +20,15 @@ export interface ChatRequest {
   requestId?: string;
   /** Model selected from the server-enumerated provider catalog. */
   model?: string;
+  /** User-selected domain prompt module. Never inferred by the server. */
+  skill?: SkillId;
+}
+
+export const SKILL_IDS = ["general", "math", "chemistry"] as const;
+export type SkillId = (typeof SKILL_IDS)[number];
+
+export function isSkillId(value: unknown): value is SkillId {
+  return typeof value === "string" && (SKILL_IDS as readonly string[]).includes(value);
 }
 
 /** Runtime configuration loaded from .dev.vars or process environment. */

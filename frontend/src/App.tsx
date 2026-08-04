@@ -261,6 +261,8 @@ function ChatApp() {
         selectedModel={chat.selectedModel}
         onSelectedModelChange={chat.setSelectedModel}
         modelsLoading={chat.modelsLoading}
+        selectedSkill={chat.selectedSkill}
+        onSelectedSkillChange={chat.setSelectedSkill}
       />
     </div>
   );

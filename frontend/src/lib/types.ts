@@ -35,6 +35,8 @@ export interface ModelOption {
   displayName: string;
 }
 
+export type SkillId = "general" | "math" | "chemistry";
+
 export interface ToolResult {
   ok: boolean;
   output: string;

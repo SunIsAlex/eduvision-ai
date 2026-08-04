@@ -68,6 +68,7 @@ export async function* runPipeline(
       model,
       requestId: request.requestId,
       thinking: request.thinking === true,
+      skill: request.skill ?? "general",
     });
     try {
       for await (const delta of gen) {

@@ -4,7 +4,7 @@ import { streamSSE } from "hono/streaming";
 import { runPipeline } from "./stream";
 import { deliverBrowserToolResult } from "./toolbridge";
 import { getModelCatalog, isAvailableModel } from "./model-catalog";
-import { resolveModel, type ChatRequest, type Env } from "./types";
+import { isSkillId, resolveModel, type ChatRequest, type Env } from "./types";
 import {
   authCookie,
   adminAuthCookie,
@@ -177,6 +177,9 @@ app.post("/api/chat/stream", async (c) => {
   }
   if (body.model && !isAvailableModel(body.model, c.env)) {
     return c.json({ error: "所选模型当前不可用，请刷新模型列表后重试" }, 400);
+  }
+  if (body.skill !== undefined && !isSkillId(body.skill)) {
+    return c.json({ error: "所选 SKILL 不存在" }, 400);
   }
 
   return streamSSE(c, async (stream) => {

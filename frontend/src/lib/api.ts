@@ -1,4 +1,4 @@
-import type { ApiMessage, ModelOption } from "./types";
+import type { ApiMessage, ModelOption, SkillId } from "./types";
 import { runTool } from "./toolRunner";
 
 export interface StreamCallbacks {
@@ -35,6 +35,7 @@ export async function streamChat(
     history: ApiMessage[];
     thinking?: boolean;
     model?: string;
+    skill?: SkillId;
   },
   callbacks: StreamCallbacks,
   signal?: AbortSignal

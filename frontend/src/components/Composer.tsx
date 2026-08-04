@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
-import { Brain, Cpu, Send, Square } from "lucide-react";
+import { BookOpen, Brain, Cpu, Send, Square } from "lucide-react";
 import { ImageUpload } from "./ImageUpload";
 import { cn } from "../lib/utils";
-import type { ModelOption } from "../lib/types";
+import type { ModelOption, SkillId } from "../lib/types";
 
 interface Props {
   value: string;
@@ -19,6 +19,8 @@ interface Props {
   selectedModel: string;
   onSelectedModelChange: (model: string) => void;
   modelsLoading: boolean;
+  selectedSkill: SkillId;
+  onSelectedSkillChange: (skill: SkillId) => void;
 }
 
 export function Composer(props: Props) {
@@ -98,6 +100,21 @@ export function Composer(props: Props) {
           <Brain className="h-3.5 w-3.5" />
           深度思考 {props.thinkingEnabled ? "开" : "关"}
         </button>
+        <label className="flex items-center gap-2 rounded-full border border-[#424242] bg-[#2f2f2f] px-3.5 py-1.5 text-[13px] font-medium leading-5 text-[#a0a0a0] transition focus-within:border-[#5a5a5a]">
+          <BookOpen className="h-3.5 w-3.5 shrink-0 text-emerald-300" />
+          <span className="sr-only">选择解题 SKILL</span>
+          <select
+            value={props.selectedSkill}
+            disabled={loading || disabled}
+            onChange={(event) => props.onSelectedSkillChange(event.target.value as SkillId)}
+            className="bg-transparent text-[#d1d1d1] outline-none disabled:opacity-50"
+            title="由你选择本轮及后续对话使用的学科规范"
+          >
+            <option value="general" className="bg-[#2f2f2f]">通用 SKILL</option>
+            <option value="math" className="bg-[#2f2f2f]">数学 SKILL</option>
+            <option value="chemistry" className="bg-[#2f2f2f]">化学 SKILL</option>
+          </select>
+        </label>
         <label className="flex min-w-0 items-center gap-2 rounded-full border border-[#424242] bg-[#2f2f2f] px-3.5 py-1.5 text-[13px] font-medium leading-5 text-[#a0a0a0] transition focus-within:border-[#5a5a5a]">
           <Cpu className="h-3.5 w-3.5 shrink-0 text-brand-300" />
           <span className="sr-only">选择模型</span>
