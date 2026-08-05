@@ -5,7 +5,6 @@ import { ChatMessage } from "./components/ChatMessage";
 import { SessionDrawer } from "./components/SessionDrawer";
 import { useChat } from "./hooks/useChat";
 import type { LocalApiConfig } from "./lib/localConfig";
-import type { ModelOption } from "./lib/types";
 
 const EXAMPLES = [
   "解方程 x²-5x+6=0，并说明使用了什么方法",
@@ -245,6 +244,7 @@ function ChatApp({ guestMode = false, onExitGuest }: { guestMode?: boolean; onEx
             title="选择本轮及后续对话使用的模型"
           >
             <span className="sr-only">选择模型</span>
+            <span className="shrink-0 text-xs font-medium text-mute">回答</span>
             <select
               value={chat.selectedModel}
               disabled={chat.loading || chat.modelsLoading}
@@ -263,6 +263,29 @@ function ChatApp({ guestMode = false, onExitGuest }: { guestMode?: boolean; onEx
             </select>
             <ChevronDown className="h-3.5 w-3.5 shrink-0 text-faint" />
           </label>
+          {chat.localApiConfig.apiKey.trim() && chat.localApiConfig.apiUrl.trim() && (
+            <label
+              className="flex h-8 min-w-0 cursor-pointer items-center gap-1 rounded-lg pl-2 pr-1 text-xs font-medium text-mute transition hover:bg-black/5"
+              title="回答模型不支持图片时，用此模型识别题目"
+            >
+              <span className="shrink-0">OCR</span>
+              <select
+                value={chat.localApiConfig.ocrModel ?? ""}
+                disabled={chat.loading || chat.modelsLoading}
+                onChange={(event) => chat.setOcrModel(event.target.value)}
+                className="min-w-0 max-w-[7rem] cursor-pointer appearance-none truncate bg-transparent text-ink outline-none disabled:opacity-50 sm:max-w-[14rem]"
+                aria-label="选择 OCR 模型"
+              >
+                <option value="">请选择模型</option>
+                {chat.models.map((model) => (
+                  <option key={model.id} value={model.id} className="bg-white text-ink">
+                    {model.displayName}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="h-3.5 w-3.5 shrink-0 text-faint" />
+            </label>
+          )}
           <div className="ml-auto flex items-center gap-0.5">
             {guestMode && (
               <button
@@ -407,7 +430,6 @@ function ChatApp({ guestMode = false, onExitGuest }: { guestMode?: boolean; onEx
       {configOpen && (
         <ManualConfigDialog
           value={chat.localApiConfig}
-          models={chat.models}
           onSave={(value) => {
             chat.setLocalApiConfig(value);
             setConfigOpen(false);
@@ -421,18 +443,15 @@ function ChatApp({ guestMode = false, onExitGuest }: { guestMode?: boolean; onEx
 
 function ManualConfigDialog({
   value,
-  models,
   onSave,
   onClose,
 }: {
   value: LocalApiConfig;
-  models: ModelOption[];
   onSave: (value: LocalApiConfig) => void;
   onClose: () => void;
 }) {
   const [apiUrl, setApiUrl] = useState(value.apiUrl);
   const [apiKey, setApiKey] = useState(value.apiKey);
-  const [ocrModel, setOcrModel] = useState(value.ocrModel ?? "");
   const [showKey, setShowKey] = useState(false);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4" onMouseDown={onClose}>
@@ -441,7 +460,7 @@ function ManualConfigDialog({
         onMouseDown={(event) => event.stopPropagation()}
         onSubmit={(event) => {
           event.preventDefault();
-          onSave({ apiUrl: apiUrl.trim(), apiKey: apiKey.trim(), ocrModel: ocrModel.trim() });
+          onSave({ apiUrl: apiUrl.trim(), apiKey: apiKey.trim(), ocrModel: value.ocrModel ?? "" });
         }}
       >
         <div className="flex items-center justify-between">
@@ -461,22 +480,6 @@ function ManualConfigDialog({
             placeholder="https://api.example.com 或 .../v1/chat/completions"
             className="mt-2 w-full rounded-xl border border-line bg-cream px-3 py-2.5 font-mono text-xs outline-none focus:border-brand-500"
           />
-        </label>
-        <label className="mt-4 block text-sm font-medium">
-          图片 OCR 模型
-          <select
-            value={ocrModel}
-            onChange={(event) => setOcrModel(event.target.value)}
-            className="mt-2 w-full rounded-xl border border-line bg-cream px-3 py-2.5 text-sm outline-none focus:border-brand-500"
-          >
-            <option value="">不指定（仅当解题模型支持图片时）</option>
-            {models.filter((model) => model.multimodal).map((model) => (
-              <option key={model.id} value={model.id}>{model.displayName}</option>
-            ))}
-          </select>
-          <span className="mt-1 block text-xs font-normal leading-5 text-faint">
-            当上方模型不支持多模态时，使用此模型先把图片转成可编辑题目文字。
-          </span>
         </label>
         <label className="mt-4 block text-sm font-medium">
           API Key

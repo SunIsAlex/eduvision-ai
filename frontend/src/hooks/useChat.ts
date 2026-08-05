@@ -90,7 +90,7 @@ export function useChat({ guestMode = false }: { guestMode?: boolean } = {}) {
     return () => {
       active = false;
     };
-  }, [localApiConfig, guestMode]);
+  }, [localApiConfig.apiKey, localApiConfig.apiUrl, guestMode]);
 
   // URL 会话先用本地副本快速恢复，再用服务端快照校准，方便跨设备恢复和调试。
   useEffect(() => {
@@ -374,6 +374,14 @@ export function useChat({ guestMode = false }: { guestMode?: boolean } = {}) {
   const setLocalApiConfig = useCallback((config: LocalApiConfig) => {
     setLocalApiConfigState(config);
     saveLocalApiConfig(config);
+  }, []);
+
+  const setOcrModel = useCallback((ocrModel: string) => {
+    setLocalApiConfigState((current) => {
+      const next = { ...current, ocrModel };
+      saveLocalApiConfig(next);
+      return next;
+    });
   }, []);
 
   const send = useCallback(async () => {
@@ -695,6 +703,7 @@ ${m.content}`.trim();
     setUltraEnabled,
     localApiConfig,
     setLocalApiConfig,
+    setOcrModel,
     models,
     selectedModel,
     setSelectedModel,

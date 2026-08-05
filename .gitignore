@@ -9,3 +9,4 @@ dist/
 worker/seed-output/
 .session-data/
 dpsk
+local_api

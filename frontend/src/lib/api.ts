@@ -15,7 +15,7 @@ function discoveredMultimodal(model: Record<string, unknown>): boolean {
     .map((value) => String(value).toLowerCase());
   if (values.some((value) => /image|vision|audio|multimodal/.test(value))) return true;
   const id = String(model.id ?? "").toLowerCase();
-  return /vision|omni|4o|4\.1|sonnet|gemini|luna|sol/.test(id);
+  return /vision|omni|ocr|(?:^|[-_/])vl(?:$|[-_/])|4o|4\.1|sonnet|gemini|luna|sol/.test(id);
 }
 
 /** Discover models directly from a manually configured OpenAI-compatible API. */

@@ -74,7 +74,7 @@ function localSystem(thinking: boolean, ultra: boolean): string {
 function imageModel(model: string | undefined, available: ModelOption[]): boolean {
   const found = available.find((item) => item.id === model);
   if (found) return found.multimodal === true;
-  return /vision|omni|4o|4\.1|sonnet|gemini|luna|sol/i.test(model ?? "");
+  return /vision|omni|ocr|(?:^|[-_/])vl(?:$|[-_/])|4o|4\.1|sonnet|gemini|luna|sol/i.test(model ?? "");
 }
 
 function isDeepSeek(config: LocalApiConfig): boolean {
@@ -164,12 +164,13 @@ export async function streamLocalChat(
   const activeModel = effectiveModel(config, selected, thinking, available);
   let forceFormalAnswer = false;
   const selectedSupportsImage = imageModel(activeModel, available);
-  const configuredOcr = available.find(
-    (model) => model.id === config.ocrModel && model.multimodal === true
-  )?.id;
+  // OCR capability metadata is often missing from OpenAI-compatible /models
+  // responses. The user therefore chooses this model explicitly; do not
+  // reject that choice based on the same unreliable capability heuristic.
+  const configuredOcr = available.find((model) => model.id === config.ocrModel)?.id;
   const vision = selectedSupportsImage ? activeModel : configuredOcr;
   if (image && !selectedSupportsImage && !vision) {
-    cb.onError("当前解题模型不支持图片，请在“手动配置”中选择一个 OCR 模型后重试");
+    cb.onError("当前回答模型不支持图片，请在顶部 OCR 列表中选择模型后重试");
     return;
   }
   if (image && vision) {
