@@ -164,9 +164,14 @@ export async function streamLocalChat(
   const activeModel = effectiveModel(config, selected, thinking, available);
   let forceFormalAnswer = false;
   const selectedSupportsImage = imageModel(activeModel, available);
-  const vision = selectedSupportsImage
-    ? activeModel
-    : available.find((model) => model.multimodal)?.id;
+  const configuredOcr = available.find(
+    (model) => model.id === config.ocrModel && model.multimodal === true
+  )?.id;
+  const vision = selectedSupportsImage ? activeModel : configuredOcr;
+  if (image && !selectedSupportsImage && !vision) {
+    cb.onError("当前解题模型不支持图片，请在“手动配置”中选择一个 OCR 模型后重试");
+    return;
+  }
   if (image && vision) {
     cb.onThinking(`正在使用 ${vision} 做题目 OCR 复述…`);
     try {

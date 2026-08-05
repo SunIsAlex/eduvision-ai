@@ -5,6 +5,7 @@ import { ChatMessage } from "./components/ChatMessage";
 import { SessionDrawer } from "./components/SessionDrawer";
 import { useChat } from "./hooks/useChat";
 import type { LocalApiConfig } from "./lib/localConfig";
+import type { ModelOption } from "./lib/types";
 
 const EXAMPLES = [
   "解方程 x²-5x+6=0，并说明使用了什么方法",
@@ -406,6 +407,7 @@ function ChatApp({ guestMode = false, onExitGuest }: { guestMode?: boolean; onEx
       {configOpen && (
         <ManualConfigDialog
           value={chat.localApiConfig}
+          models={chat.models}
           onSave={(value) => {
             chat.setLocalApiConfig(value);
             setConfigOpen(false);
@@ -419,15 +421,18 @@ function ChatApp({ guestMode = false, onExitGuest }: { guestMode?: boolean; onEx
 
 function ManualConfigDialog({
   value,
+  models,
   onSave,
   onClose,
 }: {
   value: LocalApiConfig;
+  models: ModelOption[];
   onSave: (value: LocalApiConfig) => void;
   onClose: () => void;
 }) {
   const [apiUrl, setApiUrl] = useState(value.apiUrl);
   const [apiKey, setApiKey] = useState(value.apiKey);
+  const [ocrModel, setOcrModel] = useState(value.ocrModel ?? "");
   const [showKey, setShowKey] = useState(false);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4" onMouseDown={onClose}>
@@ -436,7 +441,7 @@ function ManualConfigDialog({
         onMouseDown={(event) => event.stopPropagation()}
         onSubmit={(event) => {
           event.preventDefault();
-          onSave({ apiUrl: apiUrl.trim(), apiKey: apiKey.trim() });
+          onSave({ apiUrl: apiUrl.trim(), apiKey: apiKey.trim(), ocrModel: ocrModel.trim() });
         }}
       >
         <div className="flex items-center justify-between">
@@ -458,6 +463,22 @@ function ManualConfigDialog({
           />
         </label>
         <label className="mt-4 block text-sm font-medium">
+          图片 OCR 模型
+          <select
+            value={ocrModel}
+            onChange={(event) => setOcrModel(event.target.value)}
+            className="mt-2 w-full rounded-xl border border-line bg-cream px-3 py-2.5 text-sm outline-none focus:border-brand-500"
+          >
+            <option value="">不指定（仅当解题模型支持图片时）</option>
+            {models.filter((model) => model.multimodal).map((model) => (
+              <option key={model.id} value={model.id}>{model.displayName}</option>
+            ))}
+          </select>
+          <span className="mt-1 block text-xs font-normal leading-5 text-faint">
+            当上方模型不支持多模态时，使用此模型先把图片转成可编辑题目文字。
+          </span>
+        </label>
+        <label className="mt-4 block text-sm font-medium">
           API Key
           <div className="relative mt-2">
             <input
@@ -475,7 +496,7 @@ function ManualConfigDialog({
         </label>
         <p className="mt-4 text-xs leading-5 text-faint">Key 只保存在本机 localStorage，不会提交到 EduVision 服务器。API 服务必须允许浏览器跨域请求。</p>
         <div className="mt-6 flex justify-end gap-2">
-          <button type="button" onClick={() => onSave({ apiUrl: "", apiKey: "" })} className="rounded-xl px-3 py-2 text-sm text-red-500 hover:bg-red-50">清除配置</button>
+          <button type="button" onClick={() => onSave({ apiUrl: "", apiKey: "", ocrModel: "" })} className="rounded-xl px-3 py-2 text-sm text-red-500 hover:bg-red-50">清除配置</button>
           <button type="submit" disabled={!apiUrl.trim() || !apiKey.trim()} className="rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50">保存并启用</button>
         </div>
       </form>

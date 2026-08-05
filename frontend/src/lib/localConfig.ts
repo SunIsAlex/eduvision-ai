@@ -2,6 +2,8 @@
 export interface LocalApiConfig {
   apiKey: string;
   apiUrl: string;
+  /** Optional model used to transcribe images when the answer model is text-only. */
+  ocrModel?: string;
 }
 
 const STORAGE_KEY = "eduvision-local-api-config-v1";
@@ -12,9 +14,10 @@ export function loadLocalApiConfig(): LocalApiConfig {
     return {
       apiKey: typeof value?.apiKey === "string" ? value.apiKey : "",
       apiUrl: typeof value?.apiUrl === "string" ? value.apiUrl : "",
+      ocrModel: typeof value?.ocrModel === "string" ? value.ocrModel : "",
     };
   } catch {
-    return { apiKey: "", apiUrl: "" };
+    return { apiKey: "", apiUrl: "", ocrModel: "" };
   }
 }
 
