@@ -4,6 +4,11 @@ import { pooledFetch } from "./upstream";
 export interface ModelInfo {
   id: string;
   displayName: string;
+  multimodal?: boolean;
+}
+
+export function modelSupportsImage(model: string): boolean {
+  return /claude|vision|omni|ocr|(?:^|[-_/])vl(?:$|[-_/])|4o|4\.1|sonnet|gemini|luna|sol/i.test(model);
 }
 
 let catalog: ModelInfo[] = [];
@@ -36,13 +41,14 @@ export async function initializeModelCatalog(env: Env): Promise<void> {
           typeof item.display_name === "string" && item.display_name.trim()
             ? item.display_name
             : item.id,
+        multimodal: modelSupportsImage(item.id),
       });
     }
-    if (!unique.has(fallback)) unique.set(fallback, { id: fallback, displayName: fallback });
+    if (!unique.has(fallback)) unique.set(fallback, { id: fallback, displayName: fallback, multimodal: modelSupportsImage(fallback) });
     catalog = [...unique.values()].sort((a, b) => a.displayName.localeCompare(b.displayName));
     console.log(`[models] enumerated ${catalog.length} models; default=${fallback}`);
   } catch (error) {
-    catalog = [{ id: fallback, displayName: fallback }];
+    catalog = [{ id: fallback, displayName: fallback, multimodal: modelSupportsImage(fallback) }];
     console.warn(`[models] enumeration failed; using default=${fallback}:`, (error as Error).message);
   } finally {
     clearTimeout(timer);
@@ -54,7 +60,7 @@ export function getModelCatalog(env: Env): { models: ModelInfo[]; defaultModel: 
   const defaultModel = resolveModel(env.API_MODEL);
   const models = initialized && catalog.length > 0
     ? catalog
-    : [{ id: defaultModel, displayName: defaultModel }];
+    : [{ id: defaultModel, displayName: defaultModel, multimodal: modelSupportsImage(defaultModel) }];
   return { models, defaultModel };
 }
 

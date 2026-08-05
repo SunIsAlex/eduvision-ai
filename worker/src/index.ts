@@ -215,6 +215,9 @@ app.post("/api/chat/stream", async (c) => {
   if (body.ultra !== undefined && typeof body.ultra !== "boolean") {
     return c.json({ error: "ultra 参数无效" }, 400);
   }
+  if (body.ocrConfirmed !== undefined && typeof body.ocrConfirmed !== "boolean") {
+    return c.json({ error: "ocrConfirmed 参数无效" }, 400);
+  }
 
   return streamSSE(c, async (stream) => {
     // 客户端断开（点“停止”或直接关闭页面）时取消上游流，避免继续消耗

@@ -24,6 +24,8 @@ export interface ChatRequest {
   skill?: SkillId;
   /** Ultra 模式：高智力模型规划思路，子代理校验数值后再作答。 */
   ultra?: boolean;
+  /** OCR transcription was reviewed by the user; proceed to solving. */
+  ocrConfirmed?: boolean;
 }
 
 export const SKILL_IDS = ["general", "math", "chemistry"] as const;

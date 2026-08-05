@@ -236,6 +236,9 @@ async function handleFrame(
       case "thinking":
         if (parsed.text) cb.onThinking(parsed.text);
         break;
+      case "ocr_result":
+        if (parsed.text) cb.onOcrResult?.(parsed.text);
+        break;
       case "answer":
         if (parsed.text) cb.onAnswer(parsed.text);
         break;

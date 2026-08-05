@@ -191,6 +191,41 @@ function imageBlock(image: string): ImageBlockParam {
   return { type: "image", source: { type: "url", url: image } };
 }
 
+/** Strict first-pass transcription used before the user confirms the question. */
+export async function transcribeImage(
+  env: Env,
+  model: string,
+  image: string,
+  signal?: AbortSignal
+): Promise<string> {
+  const client = createClient(env, signal);
+  const stream = await createWithRetry(client, {
+    model,
+    max_tokens: 2048,
+    stream: true,
+    system:
+      "你是严格的题目 OCR 转录器。只复述图片中可见的题目文字、数字、符号、上下标、点名和图形关系；不要解题、分析、补全、纠错或猜测。看不清的内容原位标记为【无法辨认】，只输出转录正文。",
+    messages: [
+      {
+        role: "user",
+        content: [
+          imageBlock(image),
+          { type: "text", text: "请逐字转录这张题目图片，禁止作答。" },
+        ],
+      },
+    ],
+    tools: [],
+    temperature: 0,
+  });
+  let text = "";
+  for await (const delta of streamRound(stream)) {
+    if (delta.kind === "content") text += delta.text;
+  }
+  text = text.trim();
+  if (!text) throw new Error("OCR 模型没有返回题目复述");
+  return text;
+}
+
 /** Convert app messages into Anthropic's native multimodal format. */
 function toAnthropicMessages(messages: ChatMessage[]): MessageParam[] {
   return messages.map((m) => {

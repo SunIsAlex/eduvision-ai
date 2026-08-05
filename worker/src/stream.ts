@@ -1,5 +1,6 @@
-import { streamAnswer } from "./reasoning";
-import { resolveModel, type ChatRequest, type Env } from "./types";
+import { streamAnswer, transcribeImage } from "./reasoning";
+import { isAvailableModel, modelSupportsImage } from "./model-catalog";
+import { MODELS, resolveModel, type ChatRequest, type Env } from "./types";
 
 /** SSE event shapes sent to the browser. */
 export interface StreamEvent {
@@ -13,6 +14,7 @@ export interface StreamEvent {
     | "tool_call"
     | "tool_result"
     | "debug"
+    | "ocr_result"
     | "done"
     | "error";
   data: string;
@@ -53,6 +55,26 @@ export async function* runPipeline(
   }
 
   const model = request.model?.trim() || resolveModel(env.API_MODEL);
+  if (request.image && request.ocrConfirmed !== true) {
+    const ocrModel = [model, resolveModel(env.API_MODEL), MODELS.VISION].find(
+      (candidate) => modelSupportsImage(candidate) && isAvailableModel(candidate, env)
+    ) ?? model;
+    yield thinking(`正在使用 ${ocrModel} 复述图片题目…`);
+    try {
+      const transcription = await transcribeImage(env, ocrModel, request.image, signal);
+      const text = `${request.question?.trim() ?? ""}\n\n${transcription}`.trim();
+      yield { event: "ocr_result", data: JSON.stringify({ text }) };
+      yield {
+        event: "done",
+        data: JSON.stringify({ pipeline: "server-ocr", model: ocrModel }),
+      };
+    } catch (err) {
+      if (signal?.aborted || (err as Error).name === "AbortError") return;
+      console.error("[ocr] server transcription failed:", err);
+      yield error("图片 OCR 失败，请重试或换用支持图片的模型。");
+    }
+    return;
+  }
   yield thinking(
     request.thinking === true
       ? request.image
@@ -65,12 +87,15 @@ export async function* runPipeline(
 
   let emittedContent = false;
   try {
+    const answerSupportsImage = modelSupportsImage(model);
     const gen = streamAnswer(
       env,
       {
         question: request.question ?? "",
-        image: request.image,
-        history: request.history,
+        image: request.image && answerSupportsImage ? request.image : undefined,
+        history: answerSupportsImage
+          ? request.history
+          : request.history?.map((message) => ({ ...message, image: undefined })),
         model,
         requestId: request.requestId,
         thinking: request.thinking === true,
