@@ -270,7 +270,7 @@ export function ChatMessage({ message, thinking, showDebug = false, isLast = fal
           )}
           {/* 最近一条用户提问可编辑：保存后按新提问重新生成。 */}
           {isLastUserMessage && !editing && (
-            <div className="mt-2 flex justify-end">
+            <div className="mt-2 flex justify-end gap-1.5">
               <button
                 type="button"
                 onClick={() => setEditing(true)}
@@ -279,6 +279,16 @@ export function ChatMessage({ message, thinking, showDebug = false, isLast = fal
                 <Pencil className="h-3 w-3" />
                 编辑
               </button>
+              {message.ocrGenerated && !message.ocrConfirmed && (
+                <button
+                  type="button"
+                  onClick={() => onEditUser?.(message.id, message.content)}
+                  className="flex h-7 items-center gap-1.5 rounded-full bg-brand-500 px-3 text-xs font-medium text-white transition hover:bg-brand-600"
+                >
+                  <Check className="h-3 w-3" />
+                  确认并作答
+                </button>
+              )}
             </div>
           )}
           {editing && (

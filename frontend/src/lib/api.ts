@@ -90,6 +90,8 @@ export async function streamChat(
     ultra?: boolean;
     localConfig?: LocalApiConfig;
     availableModels?: ModelOption[];
+    /** OCR text has been reviewed; solve without transcribing the image again. */
+    ocrConfirmed?: boolean;
   },
   callbacks: StreamCallbacks,
   signal?: AbortSignal

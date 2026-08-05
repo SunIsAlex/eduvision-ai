@@ -154,6 +154,7 @@ export async function streamLocalChat(
     model?: string;
     ultra?: boolean;
     availableModels?: ModelOption[];
+    ocrConfirmed?: boolean;
   },
   config: LocalApiConfig,
   cb: StreamCallbacks,
@@ -173,26 +174,29 @@ export async function streamLocalChat(
   // reject that choice based on the same unreliable capability heuristic.
   const configuredOcr = available.find((model) => model.id === config.ocrModel)?.id;
   const vision = selectedSupportsImage ? activeModel : configuredOcr;
-  if (image && !selectedSupportsImage && !vision) {
+  if (image && !request.ocrConfirmed && !selectedSupportsImage && !vision) {
     cb.onError("当前回答模型不支持图片，请在顶部 OCR 列表中选择模型后重试");
     return;
   }
-  if (image && vision) {
+  if (image && !request.ocrConfirmed && vision) {
     cb.onThinking(`正在使用 ${vision} 做题目 OCR 复述…`);
     try {
       const transcription = await ocrImage(config, vision, image, signal);
       question = `${question}\n\n${transcription}`.trim();
       cb.onOcrResult?.(question);
       cb.onDebug?.("local_ocr", { model: vision, text: transcription });
-      // A multimodal solver receives both the editable transcription and the
-      // original image, preserving diagrams/layout. A text-only solver gets
-      // only the transcription it can actually consume.
-      if (!selectedSupportsImage) image = undefined;
+      // OCR is a separate user-review stage. Never start solving until the
+      // user confirms or corrects this transcription.
+      cb.onDone({ pipeline: "browser-local-ocr", model: vision });
+      return;
     } catch (error) {
       cb.onError(error instanceof Error ? error.message : "图片 OCR 失败");
       return;
     }
   }
+  // After confirmation, a multimodal solver still receives the original
+  // image for diagrams/layout. A text-only solver receives only reviewed OCR.
+  if (image && !selectedSupportsImage) image = undefined;
   const conversation: OpenAIMessage[] = [
     { role: "system", content: localSystem(thinking, Boolean(request.ultra)) },
     ...messages({

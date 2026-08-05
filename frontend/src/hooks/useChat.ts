@@ -313,6 +313,7 @@ export function useChat({ guestMode = false }: { guestMode?: boolean } = {}) {
       history: ApiMessage[];
       patch: (fn: (m: ChatMessage) => ChatMessage) => void;
       onOcrResult?: (text: string) => void;
+      ocrConfirmed?: boolean;
       signal?: AbortSignal;
       /** 非中止的网络错误：true 时显示错误消息，false 时保留已有内容回到暂停态。 */
       failAsError: boolean;
@@ -347,6 +348,7 @@ export function useChat({ guestMode = false }: { guestMode?: boolean } = {}) {
             ultra: ultraEnabled,
             localConfig: localApiConfig.apiKey.trim() && localApiConfig.apiUrl.trim() ? localApiConfig : undefined,
             availableModels: models,
+            ocrConfirmed: opts.ocrConfirmed,
           },
           callbacks,
           opts.signal
@@ -428,6 +430,7 @@ export function useChat({ guestMode = false }: { guestMode?: boolean } = {}) {
         prev.map((m) => (m.id === assistantMessage.id ? fn(m) : m))
       );
 
+    let ocrCompleted = false;
     try {
       await runStream({
         requestId,
@@ -435,17 +438,22 @@ export function useChat({ guestMode = false }: { guestMode?: boolean } = {}) {
         image: image ?? undefined,
         history,
         patch,
-        onOcrResult: (text) =>
+        onOcrResult: (text) => {
+          ocrCompleted = true;
           setMessages((prev) =>
             prev.map((message) =>
               message.id === userMessage.id
-                ? { ...message, content: text, ocrGenerated: true }
+                ? { ...message, content: text, ocrGenerated: true, ocrConfirmed: false }
                 : message
             )
-          ),
+          );
+        },
         signal: controller.signal,
         failAsError: true,
       });
+      if (ocrCompleted) {
+        setMessages((prev) => prev.filter((message) => message.id !== assistantMessage.id));
+      }
     } finally {
       abortRef.current = null;
       setLoading(false);
@@ -554,15 +562,21 @@ export function useChat({ guestMode = false }: { guestMode?: boolean } = {}) {
       }
       if (index !== lastUserIndex) return;
 
+      const changed = content !== target.content;
       const edited: ChatMessage = {
         ...target,
         content,
         error: false,
-        edited: true,
-        edits: [
-          ...(target.edits ?? []),
-          { previous: target.content, at: new Date().toISOString() },
-        ],
+        ...(target.ocrGenerated ? { ocrConfirmed: true } : {}),
+        ...(changed
+          ? {
+              edited: true,
+              edits: [
+                ...(target.edits ?? []),
+                { previous: target.content, at: new Date().toISOString() },
+              ],
+            }
+          : {}),
       };
       const before = messages.slice(0, index);
 
@@ -615,7 +629,8 @@ export function useChat({ guestMode = false }: { guestMode?: boolean } = {}) {
           // Once OCR text is visible and editable, a corrected transcription
           // is the source of truth. Keep displaying the original image, but do
           // not OCR it again and overwrite the user's corrections.
-          image: target.ocrGenerated ? undefined : target.image,
+          image: target.image,
+          ocrConfirmed: target.ocrGenerated === true,
           history,
           patch,
           signal: controller.signal,

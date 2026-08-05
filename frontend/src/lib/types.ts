@@ -17,6 +17,8 @@ export interface ChatMessage {
   image?: string;
   /** User text was populated from browser-local OCR; edits should not rerun OCR. */
   ocrGenerated?: boolean;
+  /** User explicitly accepted the OCR transcription and started solving. */
+  ocrConfirmed?: boolean;
   /** Pipeline that produced this answer (set on completion). */
   pipeline?: string;
   model?: string;
