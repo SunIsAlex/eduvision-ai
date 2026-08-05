@@ -74,7 +74,8 @@ export async function createOpenAIStream(
 ): Promise<AsyncIterable<RawMessageStreamEvent>> {
   const baseURL = (env.API_URL ?? DEFAULT_BASE_URL).replace(/\/$/, "");
   const summarizedThinking = Boolean(params.thinking);
-  const supportsReasoningEffort = /^(?:gpt-|o\d|codex)/i.test(params.model);
+  // Relays often namespace OpenAI model ids (for example openai/gpt-*).
+  const supportsReasoningEffort = /(?:^|[/_:])(?:gpt-|o\d|codex)/i.test(params.model);
   const configuredEffort = (params.output_config as { effort?: unknown } | undefined)?.effort;
   const reasoningEffort =
     configuredEffort === "medium" || configuredEffort === "high"
@@ -150,6 +151,19 @@ export async function createOpenAIStream(
 
 const SUMMARY_OPEN = "<reasoning_summary>";
 const SUMMARY_CLOSE = "</reasoning_summary>";
+
+/** Normalize common Chat Completions relay shapes for reasoning summaries. */
+function reasoningText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.map(reasoningText).join("");
+  if (!value || typeof value !== "object") return "";
+  const item = value as Record<string, unknown>;
+  for (const key of ["text", "delta", "summary", "content"]) {
+    const text = reasoningText(item[key]);
+    if (text) return text;
+  }
+  return "";
+}
 
 async function* translateOpenAIStream(
   body: ReadableStream<Uint8Array>,
@@ -231,8 +245,14 @@ async function* translateOpenAIStream(
         const choice = chunk.choices?.[0];
         if (!choice) continue;
         const delta = choice.delta ?? {};
-        const reasoning = delta.reasoning_content ?? delta.reasoning;
-        if (typeof reasoning === "string" && reasoning) {
+        const reasoning = reasoningText(
+          delta.reasoning_content ??
+          delta.reasoning_summary_text ??
+          delta.reasoning_summary ??
+          delta.reasoning ??
+          delta.summary
+        );
+        if (reasoning) {
           if (!reasoningStarted) {
             reasoningStarted = true;
             yield { type: "content_block_start", index: 1000, content_block: { type: "thinking" } };
