@@ -81,6 +81,10 @@ function isDeepSeek(config: LocalApiConfig): boolean {
   return /deepseek\.com/i.test(config.apiUrl);
 }
 
+function isSiliconFlow(config: LocalApiConfig): boolean {
+  return /siliconflow\.(?:cn|com)/i.test(config.apiUrl);
+}
+
 function effectiveModel(
   config: LocalApiConfig,
   selected: string,
@@ -202,6 +206,27 @@ export async function streamLocalChat(
   ];
 
   for (let round = 0; round < 4; round++) {
+    const thinkingActive = thinking && !forceFormalAnswer;
+    const requestBody = {
+      model: activeModel,
+      stream: true,
+      // DeepSeek counts reasoning_content against the same output budget.
+      // Complex homework can otherwise spend the whole 8k budget thinking
+      // and terminate with finish_reason=length before emitting content.
+      max_tokens: thinkingActive ? 32768 : 8192,
+      messages: conversation,
+      tools: [CALCULATOR_TOOL],
+      ...(isSiliconFlow(config) ? { enable_thinking: thinkingActive } : {}),
+      ...((isDeepSeek(config) || isSiliconFlow(config))
+        ? { thinking: { type: thinkingActive ? "enabled" : "disabled" } }
+        : {}),
+    };
+    cb.onDebug?.("local_request", {
+      model: activeModel,
+      round,
+      thinking: thinkingActive,
+      ...(isSiliconFlow(config) ? { enable_thinking: thinkingActive } : {}),
+    });
     const response = await fetch(url, {
       method: "POST",
       headers: {
@@ -209,19 +234,7 @@ export async function streamLocalChat(
         Authorization: `Bearer ${config.apiKey.trim()}`,
         "x-api-key": config.apiKey.trim(),
       },
-      body: JSON.stringify({
-        model: activeModel,
-        stream: true,
-        // DeepSeek counts reasoning_content against the same output budget.
-        // Complex homework can otherwise spend the whole 8k budget thinking
-        // and terminate with finish_reason=length before emitting content.
-        max_tokens: thinking && !forceFormalAnswer ? 32768 : 8192,
-        messages: conversation,
-        tools: [CALCULATOR_TOOL],
-        ...(isDeepSeek(config)
-          ? { thinking: { type: thinking && !forceFormalAnswer ? "enabled" : "disabled" } }
-          : {}),
-      }),
+      body: JSON.stringify(requestBody),
       signal,
     });
     if (!response.ok) {
@@ -266,7 +279,10 @@ export async function streamLocalChat(
       const thought = delta?.reasoning_content ?? delta?.reasoning;
       if (typeof thought === "string") {
         reasoning += thought;
-        cb.onReasoning(thought);
+        // Some compatible providers may still emit reasoning after being
+        // asked to disable it. Keep it in debug telemetry, but do not expose
+        // hidden reasoning in the UI when the user turned thinking off.
+        if (thinkingActive) cb.onReasoning(thought);
       }
       for (const item of delta?.tool_calls ?? []) {
         const index = Number(item.index ?? 0);
@@ -353,7 +369,7 @@ export async function streamLocalChat(
     conversation.push({
       role: "assistant",
       content: content || null,
-      ...(reasoning ? { reasoning_content: reasoning } : {}),
+      ...(thinkingActive && reasoning ? { reasoning_content: reasoning } : {}),
       tool_calls: calls.map((call) => ({
         id: call.id,
         type: "function",
