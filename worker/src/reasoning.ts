@@ -293,7 +293,7 @@ async function* runPlanner(
     ...(opts.thinking
       ? {
           thinking: { type: "adaptive" as const, display: "summarized" as const },
-          output_config: { effort: "low" as const },
+          output_config: { effort: "medium" as const },
         }
       : { temperature: 0.2 }),
   };
@@ -942,7 +942,7 @@ export async function* streamAnswer(
       model: answerModel,
       messages,
       skillPrompt,
-      thinking: input.thinking === true,
+      thinking: true,
     });
     console.log(`[ultra] ${requestId} model=${answerModel} plan=${planText.length}`);
   }
@@ -998,7 +998,7 @@ export async function* streamAnswer(
       ...(answerThinking
         ? {
             thinking: { type: "adaptive" as const, display: "summarized" as const },
-            output_config: { effort: ultra ? ("medium" as const) : ("low" as const) },
+            output_config: { effort: ultra ? ("high" as const) : ("medium" as const) },
           }
         : { temperature: 0.2 }),
       ...(mustCallTool && requiredTool

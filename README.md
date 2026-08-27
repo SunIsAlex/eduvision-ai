@@ -26,7 +26,8 @@ MyTokk Anthropic-compatible API → claude-sonnet-4-6
 
 - Claude 原生多模态读图与连续对话，保留历史文字和图片。
 - 可选 adaptive thinking 摘要。
-- 可选 Ultra 模式：高智力模型先规划解题思路，作答完成后由子代理复核最终答案的数值与代数结论，发现不一致时自动追加修正。
+- 深度思考默认开启，普通模式使用中等思考强度；用户仍可手动关闭。
+- 可选 Ultra 模式：主解使用高思考强度，先规划解题思路，作答完成后由子代理复核最终答案的数值与代数结论，发现不一致时自动追加修正。
 - SSE 流式答案、工具调用卡片和原始响应调试面板。
 - 可选浏览器本地模式：通过“手动配置”填写 OpenAI 兼容 API URL/Key，SSE 和 mathjs calculator 均在浏览器本地运行，Key 不发送到本服务。
 - VPS 加固版 calculator 与浏览器 Web Worker JavaScript 沙箱。

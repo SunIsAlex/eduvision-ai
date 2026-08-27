@@ -24,6 +24,8 @@ import { prepareImageForVision } from "../lib/image";
 import { loadLocalApiConfig, saveLocalApiConfig, type LocalApiConfig } from "../lib/localConfig";
 import type { ApiMessage, ChatMessage, ModelOption, SkillId, ThinkingStep } from "../lib/types";
 
+const REASONING_DEFAULT_VERSION = "2";
+
 export function useChat({ guestMode = false, accountId }: { guestMode?: boolean; accountId?: string } = {}) {
   const storageScope = accountId ?? "guest";
   const [sessionId, setSessionId] = useState(getOrCreateSessionId);
@@ -53,9 +55,15 @@ export function useChat({ guestMode = false, accountId }: { guestMode?: boolean;
   });
   const [thinkingEnabled, setThinkingEnabled] = useState(() => {
     try {
-      return window.localStorage.getItem("eduvision-thinking-enabled") === "true";
+      if (
+        window.localStorage.getItem("eduvision-reasoning-default-version") !==
+        REASONING_DEFAULT_VERSION
+      ) {
+        return true;
+      }
+      return window.localStorage.getItem("eduvision-thinking-enabled") !== "false";
     } catch {
-      return false;
+      return true;
     }
   });
   const [ultraEnabled, setUltraEnabled] = useState(() => {
@@ -234,6 +242,10 @@ export function useChat({ guestMode = false, accountId }: { guestMode?: boolean;
   useEffect(() => {
     try {
       window.localStorage.setItem("eduvision-thinking-enabled", String(thinkingEnabled));
+      window.localStorage.setItem(
+        "eduvision-reasoning-default-version",
+        REASONING_DEFAULT_VERSION
+      );
     } catch {
       // Storage may be unavailable in private or restricted browser contexts.
     }

@@ -96,7 +96,7 @@ export function Composer(props: Props) {
                 props.thinkingEnabled &&
                   "bg-brand-500/10 text-brand-600 hover:bg-brand-500/15 hover:text-brand-600"
               )}
-              title="开启后模型会花更多时间推理，并在可用时显示思考摘要"
+              title="默认开启；模型使用中等思考强度，并在可用时显示思考摘要"
             >
               <Brain className="h-3.5 w-3.5" />
               深度思考
