@@ -179,6 +179,7 @@ await initializeModelCatalog(runtimeEnv);
 
 // Hono's fetch signature accepts runtime configuration as the second argument.
 serve({
+  hostname: "127.0.0.1",
   fetch: async (request) => {
     const url = new URL(request.url);
     if (url.pathname === "/api/admin/config") return serveAdminConfig(request);
