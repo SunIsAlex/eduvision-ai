@@ -61,7 +61,7 @@ export interface ModelOption {
   multimodal?: boolean;
 }
 
-export type SkillId = "general" | "math" | "chemistry";
+export type SkillId = "general" | "math" | "english" | "chemistry" | "biology" | "physics";
 
 export interface ToolResult {
   ok: boolean;

@@ -1,0 +1,4 @@
+interface:
+  display_name: "化学高考解题"
+  short_description: "规范分析化学物种、反应条件、守恒关系、实验与定量计算"
+  default_prompt: "Use $chemistry to solve this Gaokao chemistry question with condition-aware reasoning and conservation checks."

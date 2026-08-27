@@ -1,5 +1,6 @@
 import { runTool } from "./toolRunner";
-import type { ApiMessage, ModelOption } from "./types";
+import type { ApiMessage, ModelOption, SkillId } from "./types";
+import { getSkillPrompt } from "./skillPrompts";
 import type { LocalApiConfig } from "./localConfig";
 import type { StreamCallbacks } from "./api";
 
@@ -61,14 +62,15 @@ function messages(request: {
   return result;
 }
 
-function localSystem(thinking: boolean, ultra: boolean): string {
+function localSystem(thinking: boolean, ultra: boolean, skill: SkillId | undefined): string {
+  const skillPrompt = getSkillPrompt(skill);
   return `你是运行在用户浏览器中的 AI 教师。默认中文、Markdown 和 LaTeX，直接给出可检查的解答。${
     thinking ? "先用一两句简短思路说明，再输出答案。" : "不要输出内部思考。"
   }${
     ultra
       ? " Ultra 模式：精确题先解析推导，圆锥曲线/解析几何去掉绝对值前必须先检验符号或给出符号区间，最后代回原等式；不要用近似值替代根式答案。"
       : ""
-  } 需要数值计算时调用 calculator 工具，工具结果来自浏览器本地 mathjs。`;
+  } 需要数值计算时调用 calculator 工具，工具结果来自浏览器本地 mathjs。${skillPrompt ? `\n\n${skillPrompt}` : ""}`;
 }
 
 function imageModel(model: string | undefined, available: ModelOption[]): boolean {
@@ -153,6 +155,7 @@ export async function streamLocalChat(
     thinking?: boolean;
     model?: string;
     ultra?: boolean;
+    skill?: SkillId;
     availableModels?: ModelOption[];
     ocrConfirmed?: boolean;
   },
@@ -198,7 +201,7 @@ export async function streamLocalChat(
   // image for diagrams/layout. A text-only solver receives only reviewed OCR.
   if (image && !selectedSupportsImage) image = undefined;
   const conversation: OpenAIMessage[] = [
-    { role: "system", content: localSystem(thinking, Boolean(request.ultra)) },
+    { role: "system", content: localSystem(thinking, Boolean(request.ultra), request.skill) },
     ...messages({
       ...request,
       question,

@@ -33,7 +33,7 @@ MyTokk Anthropic-compatible API → claude-sonnet-4-6
 - 用户名与独立密码登录；每个账号拥有隔离的云端会话列表，可跨设备恢复。
 - 当前会话仍保留 URL 定位，但必须登录所属账号才能读取。
 - Markdown、GFM、KaTeX 渲染，兼容多工具回合间相邻公式块。
-- 用户可显式选择通用、数学或化学 SKILL；学科提示词按需从 `worker/prompts/*/SKILL.md` 加载。
+- 用户可显式选择通用、数学、英语、化学、生物或物理 SKILL；学科提示词按需从 `worker/prompts/*/SKILL.md` 加载。
 
 ## 本地开发
 
@@ -54,6 +54,7 @@ npm run dev
 npm run typecheck
 npm run build
 npm run test:accounts
+npm run test:skills
 E2E_USERNAME=tester E2E_PASSWORD=your-password npm run test:tools
 ```
 
@@ -105,7 +106,7 @@ sudo /usr/local/sbin/openclaw-eduvision-root status
 
 ## API
 
-- `POST /api/chat/stream`：SSE 对话流，可传 `skill=general|math|chemistry`。
+- `POST /api/chat/stream`：SSE 对话流，可传 `skill=general|math|english|chemistry|biology|physics`。
 - `POST /api/tool/result`：浏览器回传工具结果。
 - `POST /api/title`：用当前会话模型为会话生成简短标题。
 - `GET /api/sessions`：读取当前用户的云端会话列表。
@@ -128,3 +129,15 @@ sudo /usr/local/sbin/openclaw-eduvision-root status
 - 用户密码使用带随机盐的 scrypt 哈希保存，服务端不保存明文密码。
 - 会话同时校验登录账号与 UUID；其他账号即使拿到链接也无法读取。
 - VPS 用户数据目录权限为 `eduvision:eduvision 700`，账号和会话文件均以原子方式写入。
+
+## 高考资料与学科 SKILL
+
+`worker/prompts/gaokao-corpus.json` 收录 2021–2025 五个完整归档年度的数学、英语、物理、化学、生物试卷及答案入口，共 25 组。试卷正文来自中国教育在线历年真题库，命题与答题规范同时参考教育部教育考试院和省级教育考试院的官方评析；归档答案用于交叉核验，不冒充官方阅卷评分细则。
+
+原始图片不提交到 Git。需要重新核验或更新资料时运行：
+
+```bash
+npm run sync:gaokao
+```
+
+命令会跟随分页抓取正文和图片、计算 SHA-256，并把可审计索引写入本地 `.gaokao-corpus/index.json`。2026 年已有官方试题评析，但可靠渠道尚未形成五科完整答案档案，因此当前题库使用最近五个完整年度，而不是混入考生回忆版答案。

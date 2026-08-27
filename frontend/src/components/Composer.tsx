@@ -132,7 +132,10 @@ export function Composer(props: Props) {
               >
                 <option value="general" className="bg-white text-ink">无 SKILL</option>
                 <option value="math" className="bg-white text-ink">数学 SKILL</option>
+                <option value="english" className="bg-white text-ink">英语 SKILL</option>
                 <option value="chemistry" className="bg-white text-ink">化学 SKILL</option>
+                <option value="biology" className="bg-white text-ink">生物 SKILL</option>
+                <option value="physics" className="bg-white text-ink">物理 SKILL</option>
               </select>
             </label>
           </div>

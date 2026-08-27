@@ -11,3 +11,5 @@ worker/seed-output/
 .user-data/
 dpsk
 local_api
+
+.gaokao-corpus/

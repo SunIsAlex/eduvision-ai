@@ -1,0 +1,4 @@
+interface:
+  display_name: "英语高考解题"
+  short_description: "规范完成高考英语阅读、完形、语法填空、应用写作与续写任务"
+  default_prompt: "Use $english to solve this Gaokao English question accurately and explain the decisive evidence."

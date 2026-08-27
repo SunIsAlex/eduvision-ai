@@ -15,7 +15,9 @@
     "build": "npm run typecheck && npm run build --workspace frontend",
     "typecheck": "npm run typecheck --workspace worker && npm run typecheck --workspace frontend",
     "test:tools": "tsx worker/scripts/tools-e2e.ts",
-    "test:accounts": "tsx worker/scripts/accounts-e2e.ts"
+    "test:accounts": "tsx worker/scripts/accounts-e2e.ts",
+    "test:skills": "node worker/scripts/sync-gaokao-corpus.mjs --check",
+    "sync:gaokao": "node worker/scripts/sync-gaokao-corpus.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

@@ -1,0 +1,4 @@
+interface:
+  display_name: "生物高考解题"
+  short_description: "规范完成生物概念辨析、实验设计、遗传计算与材料分析"
+  default_prompt: "Use $biology to solve this Gaokao biology question with precise terminology and evidence."

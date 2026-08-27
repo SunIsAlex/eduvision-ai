@@ -1,0 +1,243 @@
+{
+  "schemaVersion": 1,
+  "retrievedAt": "2026-08-28",
+  "scope": {
+    "years": [2021, 2022, 2023, 2024, 2025],
+    "subjects": ["math", "english", "physics", "chemistry", "biology"],
+    "rationale": "最近五个已有完整、可复核试题与答案档案的高考年度。2026 年权威渠道已有试题评析，但完整参考答案档案仍不齐全，故不纳入训练参考集。"
+  },
+  "archive": {
+    "name": "中国教育在线·掌上高考历年真题库",
+    "url": "https://gaokao.eol.cn/e_html/gk/gkst/",
+    "role": "试卷原文图片与答案页归档；答案用于交叉核验，不视为省级阅卷评分细则。"
+  },
+  "authorityReferences": [
+    {
+      "publisher": "教育部教育考试院",
+      "subject": "math",
+      "url": "https://gaokao.neea.edu.cn/html1/report/22012/3061-1.htm"
+    },
+    {
+      "publisher": "教育部教育考试院",
+      "subject": "english",
+      "url": "https://gaokao.neea.edu.cn/html1/report/22012/3104-1.htm"
+    },
+    {
+      "publisher": "教育部教育考试院",
+      "subject": "science",
+      "url": "https://gaokao.neea.edu.cn/html1/report/22012/3159-1.htm"
+    },
+    {
+      "publisher": "中华人民共和国教育部",
+      "subject": "all",
+      "url": "https://www.moe.gov.cn/jyb_xwfb/s5147/202306/t20230612_1063932.html"
+    },
+    {
+      "publisher": "浙江省教育考试院",
+      "subject": "math",
+      "url": "https://www.zjzs.net/art/2025/6/7/art_31_11264.html"
+    },
+    {
+      "publisher": "上海市教育考试院",
+      "subject": "english",
+      "url": "https://www.shmeea.edu.cn/page/02200/20250609/19465.html"
+    },
+    {
+      "publisher": "上海市教育考试院",
+      "subject": "physics",
+      "url": "https://www.shmeea.edu.cn/page/02100/20250506/19305.html"
+    },
+    {
+      "publisher": "上海市教育考试院",
+      "subject": "chemistry",
+      "url": "https://www.shmeea.edu.cn/page/02100/20250506/19304.html"
+    },
+    {
+      "publisher": "上海市教育考试院",
+      "subject": "biology",
+      "url": "https://www.shmeea.edu.cn/page/02100/20250506/19309.html"
+    },
+    {
+      "publisher": "中华人民共和国教育部",
+      "subject": "all",
+      "url": "https://www.moe.gov.cn/jyb_xwfb/xw_zt/moe_357/2026/2026_zt08/mtbd/202606/t20260610_1440059.html"
+    }
+  ],
+  "papers": [
+    {
+      "year": 2021,
+      "subject": "math",
+      "paper": "新高考全国Ⅰ卷",
+      "questionUrl": "https://gaokao.eol.cn/shiti/sx/202106/t20210608_2119837.shtml",
+      "answerUrl": "https://gaokao.eol.cn/shiti/sx/202106/t20210608_2119837.shtml"
+    },
+    {
+      "year": 2021,
+      "subject": "english",
+      "paper": "新高考全国Ⅰ卷",
+      "questionUrl": "https://gaokao.eol.cn/shiti/yy/202106/t20210608_2119877.shtml",
+      "answerUrl": "https://gaokao.eol.cn/shiti/yy/202106/t20210608_2119877.shtml"
+    },
+    {
+      "year": 2021,
+      "subject": "physics",
+      "paper": "山东卷",
+      "questionUrl": "https://gaokao.eol.cn/shiti/wl/202111/t20211116_2175813.shtml",
+      "answerUrl": "https://gaokao.eol.cn/shiti/wl/202111/t20211116_2175813.shtml"
+    },
+    {
+      "year": 2021,
+      "subject": "chemistry",
+      "paper": "山东卷",
+      "questionUrl": "https://gaokao.eol.cn/shiti/hx/202111/t20211116_2175807.shtml",
+      "answerUrl": "https://gaokao.eol.cn/shiti/hx/202111/t20211117_2176301.shtml"
+    },
+    {
+      "year": 2021,
+      "subject": "biology",
+      "paper": "山东卷",
+      "questionUrl": "https://gaokao.eol.cn/shiti/sw/202111/t20211116_2175811.shtml",
+      "answerUrl": "https://gaokao.eol.cn/shiti/sw/202111/t20211116_2175811.shtml"
+    },
+    {
+      "year": 2022,
+      "subject": "math",
+      "paper": "新高考全国Ⅰ卷",
+      "questionUrl": "https://gaokao.eol.cn/shiti/zhenti/202206/t20220607_2230480.shtml",
+      "answerUrl": "https://gaokao.eol.cn/shiti/zhenti/202206/t20220608_2230561.shtml"
+    },
+    {
+      "year": 2022,
+      "subject": "english",
+      "paper": "新高考全国Ⅰ卷",
+      "questionUrl": "https://gaokao.eol.cn/shiti/zhenti/202206/t20220609_2230741.shtml",
+      "answerUrl": "https://gaokao.eol.cn/shiti/zhenti/202206/t20220610_2230990.shtml"
+    },
+    {
+      "year": 2022,
+      "subject": "physics",
+      "paper": "山东卷",
+      "questionUrl": "https://gaokao.eol.cn/shiti/zhenti/202206/t20220611_2231118.shtml",
+      "answerUrl": "https://gaokao.eol.cn/shiti/zhenti/202206/t20220614_2231731.shtml"
+    },
+    {
+      "year": 2022,
+      "subject": "chemistry",
+      "paper": "山东卷",
+      "questionUrl": "https://gaokao.eol.cn/shiti/zhenti/202207/t20220704_2235824.shtml",
+      "answerUrl": "https://gaokao.eol.cn/shiti/hx/202208/t20220819_2242138.shtml"
+    },
+    {
+      "year": 2022,
+      "subject": "biology",
+      "paper": "山东卷",
+      "questionUrl": "https://gaokao.eol.cn/shiti/zhenti/202207/t20220704_2235825.shtml",
+      "answerUrl": "https://gaokao.eol.cn/shiti/sw/202208/t20220819_2242140.shtml"
+    },
+    {
+      "year": 2023,
+      "subject": "math",
+      "paper": "新课标Ⅰ卷",
+      "questionUrl": "https://gaokao.eol.cn/shiti/sx/202306/t20230608_2433031.shtml",
+      "answerUrl": "https://gaokao.eol.cn/shiti/sx/202306/t20230608_2433034.shtml"
+    },
+    {
+      "year": 2023,
+      "subject": "english",
+      "paper": "新课标Ⅰ卷",
+      "questionUrl": "https://gaokao.eol.cn/shiti/yy/202306/t20230611_2435466.shtml",
+      "answerUrl": "https://gaokao.eol.cn/shiti/yy/202306/t20230611_2435473.shtml"
+    },
+    {
+      "year": 2023,
+      "subject": "physics",
+      "paper": "湖北卷",
+      "questionUrl": "https://gaokao.eol.cn/shiti/wl/202306/t20230615_2441911.shtml",
+      "answerUrl": "https://gaokao.eol.cn/shiti/wl/202306/t20230615_2442089.shtml"
+    },
+    {
+      "year": 2023,
+      "subject": "chemistry",
+      "paper": "湖北卷",
+      "questionUrl": "https://gaokao.eol.cn/shiti/hx/202306/t20230614_2439942.shtml",
+      "answerUrl": "https://gaokao.eol.cn/shiti/hx/202306/t20230615_2441950.shtml"
+    },
+    {
+      "year": 2023,
+      "subject": "biology",
+      "paper": "湖北卷",
+      "questionUrl": "https://gaokao.eol.cn/shiti/hx/202306/t20230614_2439944.shtml",
+      "answerUrl": "https://gaokao.eol.cn/shiti/sw/202306/t20230615_2441947.shtml"
+    },
+    {
+      "year": 2024,
+      "subject": "math",
+      "paper": "新课标Ⅰ卷",
+      "questionUrl": "https://gaokao.eol.cn/shiti/sx/202406/t20240612_2616028.shtml",
+      "answerUrl": "https://gaokao.eol.cn/shiti/sx/202406/t20240612_2616030.shtml"
+    },
+    {
+      "year": 2024,
+      "subject": "english",
+      "paper": "新课标Ⅰ卷",
+      "questionUrl": "https://gaokao.eol.cn/shiti/yy/202406/t20240612_2616032.shtml",
+      "answerUrl": "https://gaokao.eol.cn/shiti/yy/202406/t20240612_2616032.shtml"
+    },
+    {
+      "year": 2024,
+      "subject": "physics",
+      "paper": "辽宁卷",
+      "questionUrl": "https://gaokao.eol.cn/shiti/zhenti/202406/t20240613_2616294.shtml",
+      "answerUrl": "https://gaokao.eol.cn/shiti/zhenti/202406/t20240613_2616294_7.shtml"
+    },
+    {
+      "year": 2024,
+      "subject": "chemistry",
+      "paper": "辽宁卷",
+      "questionUrl": "https://gaokao.eol.cn/shiti/hx/202406/t20240613_2616287.shtml",
+      "answerUrl": "https://gaokao.eol.cn/shiti/hx/202406/t20240613_2616287_10.shtml"
+    },
+    {
+      "year": 2024,
+      "subject": "biology",
+      "paper": "辽宁卷",
+      "questionUrl": "https://gaokao.eol.cn/shiti/sw/202406/t20240613_2616327.shtml",
+      "answerUrl": "https://gaokao.eol.cn/shiti/sw/202406/t20240613_2616327_11.shtml"
+    },
+    {
+      "year": 2025,
+      "subject": "math",
+      "paper": "全国Ⅰ卷",
+      "questionUrl": "https://gaokao.eol.cn/shiti/sx/202506/t20250607_2673303.shtml",
+      "answerUrl": "https://gaokao.eol.cn/shiti/sx/202506/t20250608_2673374.shtml"
+    },
+    {
+      "year": 2025,
+      "subject": "english",
+      "paper": "全国Ⅰ卷",
+      "questionUrl": "https://gaokao.eol.cn/shiti/yy/202506/t20250612_2674288.shtml",
+      "answerUrl": "https://gaokao.eol.cn/shiti/yy/202506/t20250612_2674296.shtml"
+    },
+    {
+      "year": 2025,
+      "subject": "physics",
+      "paper": "辽宁卷",
+      "questionUrl": "https://gaokao.eol.cn/shiti/wl/202506/t20250612_2674294.shtml",
+      "answerUrl": "https://gaokao.eol.cn/shiti/wl/202506/t20250612_2674313.shtml"
+    },
+    {
+      "year": 2025,
+      "subject": "chemistry",
+      "paper": "辽宁卷",
+      "questionUrl": "https://gaokao.eol.cn/shiti/hx/202506/t20250612_2674321.shtml",
+      "answerUrl": "https://gaokao.eol.cn/shiti/hx/202506/t20250612_2674321.shtml"
+    },
+    {
+      "year": 2025,
+      "subject": "biology",
+      "paper": "辽宁卷",
+      "questionUrl": "https://gaokao.eol.cn/shiti/sw/202506/t20250612_2674302.shtml",
+      "answerUrl": "https://gaokao.eol.cn/shiti/sw/202506/t20250612_2674302.shtml"
+    }
+  ]
+}

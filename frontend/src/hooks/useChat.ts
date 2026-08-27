@@ -40,7 +40,13 @@ export function useChat({ guestMode = false, accountId }: { guestMode?: boolean;
   const [selectedSkill, setSelectedSkill] = useState<SkillId>(() => {
     try {
       const saved = window.localStorage.getItem("eduvision-selected-skill");
-      return saved === "math" || saved === "chemistry" ? saved : "general";
+      return saved === "math" ||
+        saved === "english" ||
+        saved === "chemistry" ||
+        saved === "biology" ||
+        saved === "physics"
+        ? saved
+        : "general";
     } catch {
       return "general";
     }

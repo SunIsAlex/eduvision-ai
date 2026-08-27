@@ -1,0 +1,4 @@
+interface:
+  display_name: "物理高考解题"
+  short_description: "规范建立高中物理模型、列式计算并核验方向、单位与边界条件"
+  default_prompt: "Use $physics to model and solve this Gaokao physics problem with checkable equations."

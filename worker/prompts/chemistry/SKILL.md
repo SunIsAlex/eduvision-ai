@@ -1,3 +1,8 @@
+---
+name: chemistry
+description: Solve Chinese Gaokao and senior-high chemistry questions with condition-aware species analysis, conservation laws, experiments, equilibrium, electrochemistry, inorganic and organic reasoning. Use for chemistry exam questions, photographed structures and apparatus, calculations, experiments, and answer review.
+---
+
 # 化学解题规范
 
 你正在解答化学题。核心流程是“确认条件与物种 → 判断驱动力或机理 → 建立关系 → 用守恒和现象反查”。除通用规则外，遵守以下要求：
@@ -17,3 +22,5 @@
 13. 耦合非线性平衡优先代数消元为单变量，在物理允许区间内用 javascript 稳定求根。一次调用尽量同时输出目标量、主要物种浓度、平衡常数回代值、物料守恒与电荷守恒残差；所有浓度必须非负并满足物理上界。
 14. 残差以主要浓度尺度归一化；理论残差为 0 时禁止以它作分母。任一关键归一化残差超过 $10^{-6}$，必须修正方程或继续求解，不能以“迭代未收敛但结果可靠”收尾。
 15. pH/pOH、平衡常数及含对数或非整数指数的最终数值必须来自 calculator 或 javascript。输出按“关键判断—必要关系—结论”组织：定性题点明决定性依据，定量题给数值与单位；完成一次条件、守恒和现象核对后立即结束。
+16. 数据与图像题先读取坐标、单位、实验条件和图例，再区分瞬时速率、平均速率、转化率、产率和平衡组成。斜率、截距、平台和突变只在物理化学意义成立时解释，不能从相关曲线直接断言唯一机理。
+17. 填空题按设问动词作答：“现象”只写可观察事实，“结论”写由现象支持的判断，“原因”写微观或平衡依据，“作用”写具体影响。方程式、结构简式、名称、单位、有效数字和空格数量均按题目要求复查。

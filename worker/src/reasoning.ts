@@ -81,7 +81,10 @@ const DIRECT_TEACHER_SYSTEM = `你是一位严谨、简洁的中学教师。当�
 
 const SKILL_FILES: Partial<Record<SkillId, URL>> = {
   math: new URL("../prompts/math/SKILL.md", import.meta.url),
+  english: new URL("../prompts/english/SKILL.md", import.meta.url),
   chemistry: new URL("../prompts/chemistry/SKILL.md", import.meta.url),
+  biology: new URL("../prompts/biology/SKILL.md", import.meta.url),
+  physics: new URL("../prompts/physics/SKILL.md", import.meta.url),
 };
 const skillPromptCache = new Map<SkillId, Promise<string>>();
 
@@ -90,7 +93,10 @@ function loadSkillPrompt(skill: SkillId): Promise<string> {
   if (!file) return Promise.resolve("");
   const cached = skillPromptCache.get(skill);
   if (cached) return cached;
-  const loading = readFile(file, "utf8").then((content) => `\n\n${content.trim()}`);
+  const loading = readFile(file, "utf8").then((content) => {
+    const prompt = content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "").trim();
+    return `\n\n${prompt}`;
+  });
   skillPromptCache.set(skill, loading);
   return loading;
 }

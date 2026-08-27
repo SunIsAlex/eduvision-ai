@@ -30,7 +30,7 @@ export interface ChatRequest {
   ocrConfirmed?: boolean;
 }
 
-export const SKILL_IDS = ["general", "math", "chemistry"] as const;
+export const SKILL_IDS = ["general", "math", "english", "chemistry", "biology", "physics"] as const;
 export type SkillId = (typeof SKILL_IDS)[number];
 
 export function isSkillId(value: unknown): value is SkillId {

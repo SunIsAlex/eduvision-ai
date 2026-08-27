@@ -1,0 +1,4 @@
+interface:
+  display_name: "数学高考解题"
+  short_description: "规范完成高中数学建模、精确推导、闭合证明与结果反查"
+  default_prompt: "Use $math to solve this Gaokao mathematics problem with an exact and auditable derivation."

@@ -6,12 +6,6 @@ import { SessionDrawer } from "./components/SessionDrawer";
 import { useChat } from "./hooks/useChat";
 import type { LocalApiConfig } from "./lib/localConfig";
 
-const EXAMPLES = [
-  "解方程 x²-5x+6=0，并说明使用了什么方法",
-  "为什么铁制品会生锈？如何防止生锈？",
-  "欧姆定律是什么？并联电路总电阻怎么算？",
-];
-
 interface AccountUser {
   id: string;
   username: string;
@@ -491,7 +485,7 @@ function ChatApp({ account, guestMode = false, onExitGuest, onLogout }: { accoun
       >
         <div className="mx-auto flex min-h-full max-w-4xl flex-col gap-6 px-4 py-5 sm:px-6 sm:py-6">
           {chat.messages.length === 0 ? (
-            <Welcome onPick={(text) => chat.setInput(text)} />
+            <Welcome />
           ) : (
             chat.messages.map((m, i) => (
               <ChatMessage
@@ -761,7 +755,7 @@ function ManualConfigDialog({
   );
 }
 
-function Welcome({ onPick }: { onPick: (text: string) => void }) {
+function Welcome() {
   return (
     <div className="flex w-full flex-1 flex-col items-center justify-center gap-8 py-8 text-center">
       <div>
@@ -771,18 +765,6 @@ function Welcome({ onPick }: { onPick: (text: string) => void }) {
         <p className="mx-auto mt-4 max-w-md text-sm leading-6 text-mute">
           拍一张题目照片，AI 老师为你讲解 · 支持几何图形、函数图像、化学结构、手写题目
         </p>
-      </div>
-      <div className="grid w-full max-w-xl gap-2.5">
-        {EXAMPLES.map((text) => (
-          <button
-            key={text}
-            type="button"
-            onClick={() => onPick(text)}
-            className="rounded-xl border border-line px-4 py-3 text-left text-sm leading-6 text-mute transition hover:border-[#cbc5b4] hover:bg-card hover:text-ink"
-          >
-            {text}
-          </button>
-        ))}
       </div>
       <p className="text-xs leading-5 text-faint">
         答案由 AI 生成，请核对后再用于作业。支持数学公式（LaTeX）。
