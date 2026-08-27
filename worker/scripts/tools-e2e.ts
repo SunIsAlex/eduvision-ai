@@ -6,7 +6,31 @@
 import vm from "node:vm";
 import { calc } from "../../frontend/src/lib/calc.ts";
 
-const BASE = "http://localhost:8787";
+const BASE = process.env.E2E_BASE_URL ?? "http://localhost:8787";
+let authCookie = "";
+
+async function authenticate(): Promise<void> {
+  const username = process.env.E2E_USERNAME;
+  const password = process.env.E2E_PASSWORD;
+  if (!username || !password) {
+    throw new Error("请设置 E2E_USERNAME 和 E2E_PASSWORD；临时服务器可另设 E2E_REGISTER=true 自动注册");
+  }
+  const request = async (path: string) => fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  let response = await request("/api/auth/login");
+  if (!response.ok && process.env.E2E_REGISTER === "true") {
+    response = await request("/api/auth/register");
+  }
+  if (!response.ok) {
+    throw new Error(`E2E 登录失败（${response.status}）：${await response.text()}`);
+  }
+  authCookie = response.headers.get("set-cookie")?.split(";")[0] ?? "";
+  if (!authCookie) throw new Error("E2E 登录未返回 Cookie");
+}
+
 
 function runJsCapture(code: string): { ok: boolean; output: string } {
   const logs: string[] = [];
@@ -46,7 +70,7 @@ function runJsCapture(code: string): { ok: boolean; output: string } {
 async function postResult(requestId: string, toolCallId: string, result: { ok: boolean; output: string }) {
   const res = await fetch(`${BASE}/api/tool/result`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", cookie: authCookie },
     body: JSON.stringify({ requestId, toolCallId, ok: result.ok, output: result.output }),
   });
   console.log("  → POST /api/tool/result:", res.status, (await res.text()).slice(0, 80));
@@ -64,7 +88,7 @@ async function runScenario(label: string, question: string) {
   const t0 = Date.now();
   const res = await fetch(`${BASE}/api/chat/stream`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", cookie: authCookie },
     body: JSON.stringify({ requestId, question }),
   });
   if (!res.ok || !res.body) {
@@ -129,6 +153,8 @@ async function runScenario(label: string, question: string) {
     }
   }
 }
+
+await authenticate();
 
 await runScenario(
   "calculator",

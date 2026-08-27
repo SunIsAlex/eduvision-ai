@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
-import { Bug, Check, ChevronDown, KeyRound, Link2, Loader2, LockKeyhole, PanelLeft, SquarePen, X } from "lucide-react";
+import { Bug, Check, ChevronDown, KeyRound, Link2, Loader2, LockKeyhole, PanelLeft, UserRound, SquarePen, X } from "lucide-react";
 import { Composer } from "./components/Composer";
 import { ChatMessage } from "./components/ChatMessage";
 import { SessionDrawer } from "./components/SessionDrawer";
@@ -12,28 +12,53 @@ const EXAMPLES = [
   "欧姆定律是什么？并联电路总电阻怎么算？",
 ];
 
+interface AccountUser {
+  id: string;
+  username: string;
+}
+
+interface AuthStatus {
+  authenticated: boolean;
+  user?: AccountUser;
+  registrationEnabled: boolean;
+  registrationRequiresCode: boolean;
+  userCount: number;
+}
+
 export default function App() {
   const [authState, setAuthState] = useState<"checking" | "locked" | "open" | "guest">("checking");
+  const [account, setAccount] = useState<AccountUser | null>(null);
+  const [authStatus, setAuthStatus] = useState<AuthStatus>({
+    authenticated: false,
+    registrationEnabled: true,
+    registrationRequiresCode: false,
+    userCount: 0,
+  });
 
   useEffect(() => {
     let active = true;
-    try {
-      if (window.sessionStorage.getItem("eduvision-guest-mode") === "true") {
-        setAuthState("guest");
-        return () => {
-          active = false;
-        };
-      }
-    } catch {
-      // Session storage is optional.
-    }
     void fetch("/api/auth/status", { cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) throw new Error("鉴权状态读取失败");
-        return response.json() as Promise<{ authenticated?: boolean }>;
+        return response.json() as Promise<AuthStatus>;
       })
       .then((status) => {
-        if (active) setAuthState(status.authenticated ? "open" : "locked");
+        if (!active) return;
+        setAuthStatus(status);
+        if (status.authenticated && status.user) {
+          setAccount(status.user);
+          setAuthState("open");
+          return;
+        }
+        try {
+          if (window.sessionStorage.getItem("eduvision-guest-mode") === "true") {
+            setAuthState("guest");
+            return;
+          }
+        } catch {
+          // Session storage is optional.
+        }
+        setAuthState("locked");
       })
       .catch(() => {
         if (active) setAuthState("locked");
@@ -53,8 +78,11 @@ export default function App() {
   if (authState === "locked") {
     return (
       <LoginScreen
-        onSuccess={() => {
+        status={authStatus}
+        onSuccess={(user) => {
           try { window.sessionStorage.removeItem("eduvision-guest-mode"); } catch { /* ignore */ }
+          setAccount(user);
+          setAuthStatus((current) => ({ ...current, userCount: Math.max(1, current.userCount) }));
           setAuthState("open");
         }}
         onGuest={() => {
@@ -66,77 +94,159 @@ export default function App() {
   }
   return (
     <ChatApp
+      key={account?.id ?? "guest"}
+      account={account ?? undefined}
       guestMode={authState === "guest"}
       onExitGuest={() => {
         try { window.sessionStorage.removeItem("eduvision-guest-mode"); } catch { /* ignore */ }
+        setAuthState("locked");
+      }}
+      onLogout={() => {
+        setAccount(null);
+        const url = new URL(window.location.href);
+        url.searchParams.delete("session");
+        window.history.replaceState(null, "", url);
         setAuthState("locked");
       }}
     />
   );
 }
 
-function LoginScreen({ onSuccess, onGuest }: { onSuccess: () => void; onGuest: () => void }) {
+function LoginScreen({
+  status,
+  onSuccess,
+  onGuest,
+}: {
+  status: AuthStatus;
+  onSuccess: (user: AccountUser) => void;
+  onGuest: () => void;
+}) {
+  const [registering, setRegistering] = useState(status.userCount === 0 && status.registrationEnabled);
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const [registrationCode, setRegistrationCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!username.trim() || !password || loading) return;
+    if (registering && password !== confirmation) {
+      setError("两次输入的密码不一致");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    void fetch(registering ? "/api/auth/register" : "/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: username.trim(), password, registrationCode }),
+    })
+      .then(async (response) => {
+        const body = (await response.json().catch(() => ({}))) as { error?: string; user?: AccountUser };
+        if (!response.ok || !body.user) throw new Error(body.error ?? `登录失败（${response.status}）`);
+        onSuccess(body.user);
+      })
+      .catch((reason: unknown) => {
+        setError(reason instanceof Error ? reason.message : registering ? "注册失败" : "登录失败");
+        setPassword("");
+        setConfirmation("");
+      })
+      .finally(() => setLoading(false));
+  };
+
   return (
-    <div className="flex h-full items-center justify-center bg-cream px-5 text-ink">
+    <div className="flex h-full items-center justify-center overflow-y-auto bg-cream px-5 py-8 text-ink">
       <form
         className="w-full max-w-sm rounded-3xl border border-line bg-white p-7 shadow-[0_8px_30px_rgba(38,37,31,0.08)]"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!password || loading) return;
-          setLoading(true);
-          setError("");
-          void fetch("/api/auth/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ password }),
-          })
-            .then(async (response) => {
-              const body = (await response.json().catch(() => ({}))) as { error?: string };
-              if (!response.ok) throw new Error(body.error ?? `登录失败（${response.status}）`);
-              onSuccess();
-            })
-            .catch((reason: unknown) => {
-              setError(reason instanceof Error ? reason.message : "登录失败");
-              setPassword("");
-            })
-            .finally(() => setLoading(false));
-        }}
+        onSubmit={submit}
       >
         <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-500">
           <LockKeyhole className="h-6 w-6 text-white" />
         </div>
-        <h1 className="text-xl font-semibold tracking-tight">访问 EduVision AI</h1>
-        <p className="mt-2 text-sm leading-6 text-mute">请输入访问密码后继续。</p>
-        <label className="mt-6 block">
-          <span className="sr-only">访问密码</span>
+        <h1 className="text-xl font-semibold tracking-tight">
+          {registering ? "创建 EduVision 账号" : "登录 EduVision AI"}
+        </h1>
+        <p className="mt-2 text-sm leading-6 text-mute">
+          {registering ? "每个账号拥有独立密码和云端聊天记录。" : "登录后在任意设备继续你的对话。"}
+        </p>
+        <label className="mt-6 block text-sm font-medium">
+          用户名
           <input
             autoFocus
+            autoComplete="username"
+            value={username}
+            disabled={loading}
+            onChange={(event) => setUsername(event.target.value)}
+            placeholder="2–32 个字符"
+            className="mt-2 w-full rounded-2xl border border-line bg-cream px-4 py-3 text-base outline-none transition placeholder:text-faint focus:border-brand-500 disabled:opacity-60"
+          />
+        </label>
+        <label className="mt-4 block text-sm font-medium">
+          密码
+          <input
             type="password"
-            inputMode="numeric"
-            autoComplete="current-password"
+            autoComplete={registering ? "new-password" : "current-password"}
             value={password}
             disabled={loading}
             onChange={(event) => setPassword(event.target.value)}
-            placeholder="访问密码"
-            className="w-full rounded-2xl border border-line bg-cream px-4 py-3 text-base tracking-wider outline-none transition placeholder:tracking-normal placeholder:text-faint focus:border-brand-500 disabled:opacity-60"
+            placeholder={registering ? "至少 8 个字符" : "输入你的密码"}
+            className="mt-2 w-full rounded-2xl border border-line bg-cream px-4 py-3 text-base outline-none transition placeholder:text-faint focus:border-brand-500 disabled:opacity-60"
           />
         </label>
+        {registering && (
+          <>
+            <label className="mt-4 block text-sm font-medium">
+              确认密码
+              <input
+                type="password"
+                autoComplete="new-password"
+                value={confirmation}
+                disabled={loading}
+                onChange={(event) => setConfirmation(event.target.value)}
+                placeholder="再次输入密码"
+                className="mt-2 w-full rounded-2xl border border-line bg-cream px-4 py-3 text-base outline-none transition placeholder:text-faint focus:border-brand-500 disabled:opacity-60"
+              />
+            </label>
+            {status.registrationRequiresCode && (
+              <label className="mt-4 block text-sm font-medium">
+                邀请码
+                <input
+                  type="password"
+                  autoComplete="off"
+                  value={registrationCode}
+                  disabled={loading}
+                  onChange={(event) => setRegistrationCode(event.target.value)}
+                  placeholder="请输入管理员提供的邀请码"
+                  className="mt-2 w-full rounded-2xl border border-line bg-cream px-4 py-3 text-base outline-none transition placeholder:text-faint focus:border-brand-500 disabled:opacity-60"
+                />
+              </label>
+            )}
+          </>
+        )}
         {error && <p className="mt-3 text-sm text-red-500">{error}</p>}
         <button
           type="submit"
-          disabled={!password || loading}
+          disabled={!username.trim() || !password || loading || (registering && (!confirmation || (status.registrationRequiresCode && !registrationCode)))}
           className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-          进入
+          {registering ? "创建账号" : "登录"}
         </button>
-        <div className="my-4 flex items-center gap-3 text-xs text-faint">
+        {status.registrationEnabled && (
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => { setRegistering((current) => !current); setError(""); }}
+            className="mt-3 w-full py-2 text-sm font-medium text-brand-600 hover:text-brand-700"
+          >
+            {registering ? "已有账号？返回登录" : "没有账号？创建一个"}
+          </button>
+        )}
+        <div className="my-3 flex items-center gap-3 text-xs text-faint">
           <span className="h-px flex-1 bg-line" />
-          没有密码
+          或
           <span className="h-px flex-1 bg-line" />
         </div>
         <button
@@ -147,14 +257,15 @@ function LoginScreen({ onSuccess, onGuest }: { onSuccess: () => void; onGuest: (
         >
           进入访客模式
         </button>
-        <p className="mt-3 text-center text-xs leading-5 text-faint">访客模式只能使用浏览器本地手动 API 配置</p>
+        <p className="mt-3 text-center text-xs leading-5 text-faint">访客记录只保存在本机，且只能使用手动 API 配置</p>
       </form>
     </div>
   );
 }
 
-function ChatApp({ guestMode = false, onExitGuest }: { guestMode?: boolean; onExitGuest?: () => void }) {
-  const chat = useChat({ guestMode });
+function ChatApp({ account, guestMode = false, onExitGuest, onLogout }: { account?: AccountUser; guestMode?: boolean; onExitGuest?: () => void; onLogout?: () => void }) {
+  const chat = useChat({ guestMode, accountId: account?.id });
+  const [accountOpen, setAccountOpen] = useState(false);
   const [debug, setDebug] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -297,6 +408,17 @@ function ChatApp({ guestMode = false, onExitGuest }: { guestMode?: boolean; onEx
                 访客
               </button>
             )}
+            {account && (
+              <button
+                type="button"
+                onClick={() => setAccountOpen(true)}
+                title="账号与密码"
+                className="mr-1 flex h-8 max-w-28 items-center gap-1.5 rounded-full bg-brand-500/10 px-2.5 text-xs font-medium text-brand-700 transition hover:bg-brand-500/20"
+              >
+                <UserRound className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{account.username}</span>
+              </button>
+            )}
             {chat.messages.length > 0 && (
               <>
                 <button
@@ -346,7 +468,7 @@ function ChatApp({ guestMode = false, onExitGuest }: { guestMode?: boolean; onEx
                     window.setTimeout(() => setLinkCopied(false), 1500);
                   });
                 }}
-                title={linkCopied ? "会话链接已复制" : "复制可恢复和调试当前会话的链接"}
+                title={linkCopied ? "会话链接已复制" : "复制当前会话链接（仅当前账号可访问）"}
                 aria-label={linkCopied ? "会话链接已复制" : "复制会话链接"}
                 className={iconButton}
               >
@@ -437,6 +559,138 @@ function ChatApp({ guestMode = false, onExitGuest }: { guestMode?: boolean; onEx
           onClose={() => setConfigOpen(false)}
         />
       )}
+      {accountOpen && account && (
+        <AccountDialog
+          user={account}
+          onClose={() => setAccountOpen(false)}
+          onLogout={() => {
+            setAccountOpen(false);
+            onLogout?.();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function AccountDialog({
+  user,
+  onClose,
+  onLogout,
+}: {
+  user: AccountUser;
+  onClose: () => void;
+  onLogout: () => void;
+}) {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmation, setConfirmation] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+
+  const changePassword = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (newPassword !== confirmation) {
+      setError("两次输入的新密码不一致");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    setMessage("");
+    void fetch("/api/auth/password", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    })
+      .then(async (response) => {
+        const body = (await response.json().catch(() => ({}))) as { error?: string };
+        if (!response.ok) throw new Error(body.error ?? `修改失败（${response.status}）`);
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmation("");
+        setMessage("密码已更新，其他设备上的旧登录已失效。");
+      })
+      .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "密码修改失败"))
+      .finally(() => setLoading(false));
+  };
+
+  const logout = () => {
+    setLoggingOut(true);
+    setError("");
+    void fetch("/api/auth/logout", { method: "POST" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`退出失败（${response.status}）`);
+        onLogout();
+      })
+      .catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "退出失败"))
+      .finally(() => setLoggingOut(false));
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4" onMouseDown={onClose}>
+      <form
+        className="w-full max-w-md rounded-3xl border border-line bg-white p-6 shadow-2xl"
+        onMouseDown={(event) => event.stopPropagation()}
+        onSubmit={changePassword}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">{user.username}</h2>
+            <p className="mt-1 text-xs leading-5 text-mute">聊天记录受账号保护并保存到云端</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg p-2 text-mute hover:bg-black/5" aria-label="关闭">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="my-5 h-px bg-line" />
+        <h3 className="text-sm font-semibold">修改密码</h3>
+        <input
+          type="password"
+          autoComplete="current-password"
+          value={currentPassword}
+          onChange={(event) => setCurrentPassword(event.target.value)}
+          placeholder="当前密码"
+          className="mt-3 w-full rounded-xl border border-line bg-cream px-3 py-2.5 text-sm outline-none focus:border-brand-500"
+        />
+        <input
+          type="password"
+          autoComplete="new-password"
+          value={newPassword}
+          onChange={(event) => setNewPassword(event.target.value)}
+          placeholder="新密码（至少 8 个字符）"
+          className="mt-3 w-full rounded-xl border border-line bg-cream px-3 py-2.5 text-sm outline-none focus:border-brand-500"
+        />
+        <input
+          type="password"
+          autoComplete="new-password"
+          value={confirmation}
+          onChange={(event) => setConfirmation(event.target.value)}
+          placeholder="再次输入新密码"
+          className="mt-3 w-full rounded-xl border border-line bg-cream px-3 py-2.5 text-sm outline-none focus:border-brand-500"
+        />
+        {error && <p className="mt-3 text-sm text-red-500">{error}</p>}
+        {message && <p className="mt-3 text-sm text-emerald-600">{message}</p>}
+        <div className="mt-5 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            disabled={loggingOut || loading}
+            onClick={logout}
+            className="rounded-xl px-3 py-2 text-sm font-medium text-red-500 hover:bg-red-50 disabled:opacity-50"
+          >
+            {loggingOut ? "正在退出…" : "退出账号"}
+          </button>
+          <button
+            type="submit"
+            disabled={loading || !currentPassword || newPassword.length < 8 || !confirmation}
+            className="flex items-center gap-2 rounded-xl bg-brand-500 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-600 disabled:opacity-50"
+          >
+            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+            保存新密码
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

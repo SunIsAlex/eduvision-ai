@@ -2,6 +2,8 @@
  * Shared types for the EduVision Node backend.
  */
 
+import type { AccountStore } from "./account-store";
+
 /** A chat message from the client. `image` is a data URL or media URL. */
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -47,8 +49,16 @@ export interface Env {
   API_MODEL_REVIEW?: string;
   /** Public browser API key issued by Desmos for production embedding. */
   DESMOS_API_KEY?: string;
-  /** Optional shared password protecting every private API endpoint. */
+  /** Legacy shared password; when present it becomes the default registration invitation code. */
   ACCESS_PASSWORD?: string;
+  /** Set to false after provisioning accounts to disable self-service registration. */
+  ALLOW_REGISTRATION?: string;
+  /** Optional invitation code required while registration is enabled. */
+  REGISTRATION_CODE?: string;
+  /** Optional explicit HMAC secret; otherwise a persistent random secret is generated. */
+  AUTH_SESSION_SECRET?: string;
+  /** Node-only account and user-session persistence service. */
+  ACCOUNTS?: AccountStore;
   /** Separate password for the server configuration control panel. */
   ADMIN_ACCESS_PASSWORD?: string;
   /** Maximum number of simultaneous upstream model streams per Node process. */

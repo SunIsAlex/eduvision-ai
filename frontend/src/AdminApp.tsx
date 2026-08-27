@@ -4,7 +4,7 @@ import { Eye, EyeOff, Loader2, LockKeyhole, Plus, RotateCw, Save, Settings, Tras
 type AuthState = "checking" | "locked" | "open" | "unconfigured";
 type ConfigRow = { id: string; key: string; value: string };
 
-const SECRET_KEY_RE = /(KEY|PASSWORD|SECRET|TOKEN)$/i;
+const SECRET_KEY_RE = /(KEY|PASSWORD|SECRET|TOKEN|CODE)$/i;
 
 async function responseJson<T>(response: Response): Promise<T> {
   const body = (await response.json().catch(() => ({}))) as T & { error?: string };

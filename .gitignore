@@ -8,5 +8,6 @@ dist/
 *.log
 worker/seed-output/
 .session-data/
+.user-data/
 dpsk
 local_api

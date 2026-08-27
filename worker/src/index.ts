@@ -4,24 +4,24 @@ import { streamSSE } from "hono/streaming";
 import { runPipeline } from "./stream";
 import { cancelBrowserToolWaits, deliverBrowserToolResult } from "./toolbridge";
 import { getModelCatalog, isAvailableModel } from "./model-catalog";
+import { AccountStoreError } from "./account-store";
+import type { AccountUser } from "./account-store";
 import { resolveReviewModel, resolveUltraModel } from "./types";
 import { generateTitle } from "./title";
 import { isSkillId, resolveModel, type ChatRequest, type Env } from "./types";
 import {
-  authCookie,
   adminAuthCookie,
   constantTimeEqual,
-  createAuthToken,
   createAdminAuthToken,
-  isAuthenticatedRequest,
   isAdminAuthenticatedRequest,
 } from "./auth";
 import { getUpstreamStatus } from "./upstream";
 
-export const app = new Hono<{ Bindings: Env }>();
+export const app = new Hono<{ Bindings: Env; Variables: { user: AccountUser } }>();
 
 // Keep room for base64 expansion, JSON framing, question text and history.
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+const MAX_SESSION_BYTES = 12 * 1024 * 1024;
 
 app.use(
   "*",
@@ -34,19 +34,29 @@ app.use(
   })
 );
 
+const registrationFailures = new Map<string, { count: number; resetAt: number }>();
 const loginFailures = new Map<string, { count: number; resetAt: number }>();
 const adminLoginFailures = new Map<string, { count: number; resetAt: number }>();
 const MAX_LOGIN_FAILURES = 5;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 
+const PUBLIC_API_PATHS = new Set([
+  "/api/auth/status",
+  "/api/auth/login",
+  "/api/auth/register",
+  "/api/auth/logout",
+  "/api/admin/auth/status",
+  "/api/admin/auth/login",
+]);
+
 app.use("/api/*", async (c, next) => {
-  if (
-    ["/api/auth/status", "/api/auth/login", "/api/admin/auth/status", "/api/admin/auth/login"].includes(
-      c.req.path
-    )
-  ) return next();
-  if (await isAuthenticatedRequest(c.req.raw, c.env)) return next();
-  return c.json({ error: "请先输入访问密码" }, 401);
+  if (PUBLIC_API_PATHS.has(c.req.path) || c.req.path.startsWith("/api/admin/")) return next();
+  const store = c.env.ACCOUNTS;
+  if (!store) return c.json({ error: "账号服务未初始化" }, 503);
+  const user = await store.authenticatedUser(c.req.raw);
+  if (!user) return c.json({ error: "请先登录账号" }, 401);
+  c.set("user", user);
+  return next();
 });
 
 function clientIp(headers: Headers): string {
@@ -90,18 +100,38 @@ app.post("/api/admin/auth/login", async (c) => {
   return c.json({ ok: true });
 });
 
+function registrationEnabled(env: Env): boolean {
+  return env.ALLOW_REGISTRATION?.trim().toLowerCase() !== "false";
+}
+
+function registrationCode(env: Env): string {
+  return env.REGISTRATION_CODE?.trim() || env.ACCESS_PASSWORD?.trim() || "";
+}
+
+function accountErrorResponse(error: unknown): Response {
+  const status = error instanceof AccountStoreError ? error.status : 500;
+  const message = error instanceof AccountStoreError ? error.message : "服务器内部错误";
+  return Response.json({ error: message }, { status });
+}
+
 app.get("/api/auth/status", async (c) => {
   c.header("Cache-Control", "no-store");
+  const store = c.env.ACCOUNTS;
+  if (!store) return c.json({ error: "账号服务未初始化" }, 503);
+  const user = await store.authenticatedUser(c.req.raw);
   return c.json({
-    required: Boolean(c.env.ACCESS_PASSWORD?.trim()),
-    authenticated: await isAuthenticatedRequest(c.req.raw, c.env),
+    authenticated: Boolean(user),
+    user: user ?? undefined,
+    registrationEnabled: registrationEnabled(c.env),
+    registrationRequiresCode: Boolean(registrationCode(c.env)),
+    userCount: store.userCount,
   });
 });
 
 app.post("/api/auth/login", async (c) => {
   c.header("Cache-Control", "no-store");
-  const expected = c.env.ACCESS_PASSWORD?.trim();
-  if (!expected) return c.json({ ok: true });
+  const store = c.env.ACCOUNTS;
+  if (!store) return c.json({ error: "账号服务未初始化" }, 503);
   const ip = clientIp(c.req.raw.headers);
   const now = Date.now();
   const prior = loginFailures.get(ip);
@@ -110,21 +140,130 @@ app.post("/api/auth/login", async (c) => {
     c.header("Retry-After", String(Math.ceil((attempt.resetAt - now) / 1000)));
     return c.json({ error: "尝试次数过多，请稍后再试" }, 429);
   }
-  let body: { password?: unknown };
-  try {
-    body = await c.req.json<typeof body>();
-  } catch {
-    return c.json({ error: "请求格式无效" }, 400);
-  }
-  const supplied = typeof body.password === "string" ? body.password.slice(0, 256) : "";
-  if (!(await constantTimeEqual(supplied, expected))) {
+  const body = await c.req.json<{ username?: unknown; password?: unknown }>().catch(() => null);
+  if (!body) return c.json({ error: "请求格式无效" }, 400);
+  const username = typeof body.username === "string" ? body.username.slice(0, 64) : "";
+  const password = typeof body.password === "string" ? body.password.slice(0, 128) : "";
+  const result = await store.login(username, password);
+  if (!result) {
     attempt.count += 1;
     loginFailures.set(ip, attempt);
-    return c.json({ error: "访问密码错误" }, 401);
+    return c.json({ error: "用户名或密码错误" }, 401);
   }
   loginFailures.delete(ip);
-  c.header("Set-Cookie", authCookie(await createAuthToken(expected), c.req.raw));
+  c.header("Set-Cookie", store.cookieFor(result.token, c.req.raw));
+  return c.json({ ok: true, user: result.user });
+});
+
+app.post("/api/auth/register", async (c) => {
+  c.header("Cache-Control", "no-store");
+  const store = c.env.ACCOUNTS;
+  if (!store) return c.json({ error: "账号服务未初始化" }, 503);
+  if (!registrationEnabled(c.env)) return c.json({ error: "服务器已关闭新账号注册" }, 403);
+  const ip = clientIp(c.req.raw.headers);
+  const now = Date.now();
+  const prior = registrationFailures.get(ip);
+  const attempt = prior && prior.resetAt > now ? prior : { count: 0, resetAt: now + LOGIN_WINDOW_MS };
+  if (attempt.count >= MAX_LOGIN_FAILURES) {
+    c.header("Retry-After", String(Math.ceil((attempt.resetAt - now) / 1000)));
+    return c.json({ error: "尝试次数过多，请稍后再试" }, 429);
+  }
+  const body = await c.req.json<{
+    username?: unknown;
+    password?: unknown;
+    registrationCode?: unknown;
+  }>().catch(() => null);
+  if (!body) return c.json({ error: "请求格式无效" }, 400);
+  const expectedCode = registrationCode(c.env);
+  const suppliedCode = typeof body.registrationCode === "string" ? body.registrationCode.slice(0, 256) : "";
+  if (expectedCode && !(await constantTimeEqual(suppliedCode, expectedCode))) {
+    attempt.count += 1;
+    registrationFailures.set(ip, attempt);
+    return c.json({ error: "邀请码错误" }, 403);
+  }
+  try {
+    const result = await store.register(
+      typeof body.username === "string" ? body.username.slice(0, 64) : "",
+      typeof body.password === "string" ? body.password.slice(0, 128) : ""
+    );
+    registrationFailures.delete(ip);
+    c.header("Set-Cookie", store.cookieFor(result.token, c.req.raw));
+    return c.json({ ok: true, user: result.user }, 201);
+  } catch (error) {
+    return accountErrorResponse(error);
+  }
+});
+
+app.post("/api/auth/logout", (c) => {
+  const store = c.env.ACCOUNTS!;
+  c.header("Set-Cookie", store.logoutCookie(c.req.raw));
   return c.json({ ok: true });
+});
+
+app.put("/api/auth/password", async (c) => {
+  const store = c.env.ACCOUNTS!;
+  const body = await c.req.json<{ currentPassword?: unknown; newPassword?: unknown }>().catch(() => null);
+  if (!body) return c.json({ error: "请求格式无效" }, 400);
+  try {
+    const token = await store.changePassword(
+      c.get("user").id,
+      typeof body.currentPassword === "string" ? body.currentPassword.slice(0, 128) : "",
+      typeof body.newPassword === "string" ? body.newPassword.slice(0, 128) : ""
+    );
+    c.header("Set-Cookie", store.cookieFor(token, c.req.raw));
+    return c.json({ ok: true });
+  } catch (error) {
+    return accountErrorResponse(error);
+  }
+});
+
+app.get("/api/sessions", async (c) => {
+  c.header("Cache-Control", "no-store");
+  try {
+    return c.json({ sessions: await c.env.ACCOUNTS!.listSessions(c.get("user").id) });
+  } catch (error) {
+    return accountErrorResponse(error);
+  }
+});
+
+app.get("/api/sessions/:sessionId", async (c) => {
+  c.header("Cache-Control", "no-store");
+  try {
+    const snapshot = await c.env.ACCOUNTS!.getSession(c.get("user").id, c.req.param("sessionId"));
+    return snapshot ? c.json(snapshot) : c.json({ error: "会话不存在" }, 404);
+  } catch (error) {
+    return accountErrorResponse(error);
+  }
+});
+
+app.put("/api/sessions/:sessionId", async (c) => {
+  const declaredLength = Number(c.req.header("content-length") ?? 0);
+  if (declaredLength > MAX_SESSION_BYTES) return c.json({ error: "会话数据过大" }, 413);
+  const raw = await c.req.text();
+  if (new TextEncoder().encode(raw).byteLength > MAX_SESSION_BYTES) {
+    return c.json({ error: "会话数据过大" }, 413);
+  }
+  let value: { messages?: unknown; contextBreak?: unknown; title?: unknown; titleGenerated?: unknown };
+  try {
+    value = JSON.parse(raw) as typeof value;
+  } catch {
+    return c.json({ error: "会话数据不是合法 JSON" }, 400);
+  }
+  try {
+    await c.env.ACCOUNTS!.saveSession(c.get("user").id, c.req.param("sessionId"), value);
+    return c.json({ ok: true });
+  } catch (error) {
+    return accountErrorResponse(error);
+  }
+});
+
+app.delete("/api/sessions/:sessionId", async (c) => {
+  try {
+    await c.env.ACCOUNTS!.deleteSession(c.get("user").id, c.req.param("sessionId"));
+    return c.json({ ok: true });
+  } catch (error) {
+    return accountErrorResponse(error);
+  }
 });
 
 app.get("/health", (c) =>

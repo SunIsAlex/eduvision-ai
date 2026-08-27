@@ -6,11 +6,13 @@ import {
   deleteRemoteSession,
   getOrCreateSessionId,
   loadRemoteSession,
+  loadRemoteSessionIndex,
   replaceSessionUrl,
   saveRemoteSession,
 } from "../lib/session";
 import {
   loadSessionIndex,
+  mergeSessionIndexes,
   persistSessionIndex,
   removeSession,
   renameSession,
@@ -22,13 +24,14 @@ import { prepareImageForVision } from "../lib/image";
 import { loadLocalApiConfig, saveLocalApiConfig, type LocalApiConfig } from "../lib/localConfig";
 import type { ApiMessage, ChatMessage, ModelOption, SkillId, ThinkingStep } from "../lib/types";
 
-export function useChat({ guestMode = false }: { guestMode?: boolean } = {}) {
+export function useChat({ guestMode = false, accountId }: { guestMode?: boolean; accountId?: string } = {}) {
+  const storageScope = accountId ?? "guest";
   const [sessionId, setSessionId] = useState(getOrCreateSessionId);
-  const [messages, setMessages] = useState<ChatMessage[]>(() => loadMessages(sessionId));
-  const [sessions, setSessions] = useState<SessionMeta[]>(loadSessionIndex);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => loadMessages(sessionId, storageScope));
+  const [sessions, setSessions] = useState<SessionMeta[]>(() => loadSessionIndex(storageScope));
   const [input, setInput] = useState("");
   const [image, setImage] = useState<string | null>(null);
-  const [localApiConfig, setLocalApiConfigState] = useState<LocalApiConfig>(loadLocalApiConfig);
+  const [localApiConfig, setLocalApiConfigState] = useState<LocalApiConfig>(() => loadLocalApiConfig(storageScope));
   const [loading, setLoading] = useState(false);
   const [thinking, setThinking] = useState<ThinkingStep[]>([]);
   const [models, setModels] = useState<ModelOption[]>([]);
@@ -64,6 +67,11 @@ export function useChat({ guestMode = false }: { guestMode?: boolean } = {}) {
   // Sessions whose title was already requested this page load (guard against
   // the effect re-firing while the title request is still in flight).
   const titleRequestedRef = useRef(new Set<string>());
+  const sessionsRef = useRef(sessions);
+
+  useEffect(() => {
+    sessionsRef.current = sessions;
+  }, [sessions]);
 
   useEffect(() => {
     let active = true;
@@ -92,11 +100,28 @@ export function useChat({ guestMode = false }: { guestMode?: boolean } = {}) {
     };
   }, [localApiConfig.apiKey, localApiConfig.apiUrl, guestMode]);
 
+  // Hydrate the drawer from the signed-in user's cloud index on every device.
+  useEffect(() => {
+    if (guestMode) return;
+    let active = true;
+    void loadRemoteSessionIndex()
+      .then((cloud) => {
+        if (!active) return;
+        setSessions((local) =>
+          persistSessionIndex(mergeSessionIndexes(cloud, local), storageScope)
+        );
+      })
+      .catch((error) => console.warn("[session] cloud index failed:", error));
+    return () => {
+      active = false;
+    };
+  }, [guestMode, storageScope]);
+
   // URL 会话先用本地副本快速恢复，再用服务端快照校准，方便跨设备恢复和调试。
   useEffect(() => {
     let active = true;
     setSessionReady(false);
-    setMessages(loadMessages(sessionId));
+    setMessages(loadMessages(sessionId, storageScope));
     setContextBreak(0);
     if (guestMode) {
       setSessionReady(true);
@@ -109,7 +134,19 @@ export function useChat({ guestMode = false }: { guestMode?: boolean } = {}) {
         if (!active || !snapshot) return;
         setMessages(snapshot.messages);
         setContextBreak(Math.min(snapshot.contextBreak, snapshot.messages.length));
-        saveMessages(sessionId, snapshot.messages);
+        saveMessages(sessionId, snapshot.messages, storageScope);
+        if (snapshot.title) {
+          const remoteUpdatedAt = snapshot.updatedAt ? Date.parse(snapshot.updatedAt) : Date.now();
+          setSessions((current) => persistSessionIndex([
+            ...current.filter((item) => item.id !== sessionId),
+            {
+              id: sessionId,
+              title: snapshot.title!,
+              titleGenerated: snapshot.titleGenerated === true,
+              updatedAt: Number.isFinite(remoteUpdatedAt) ? remoteUpdatedAt : Date.now(),
+            },
+          ], storageScope));
+        }
       })
       .catch((error) => console.warn("[session] restore failed:", error))
       .finally(() => {
@@ -118,7 +155,7 @@ export function useChat({ guestMode = false }: { guestMode?: boolean } = {}) {
     return () => {
       active = false;
     };
-  }, [sessionId, guestMode]);
+  }, [sessionId, guestMode, storageScope]);
 
   // 只保存完整回合，避免 URL 恢复出半截回答。
   useEffect(() => {
@@ -127,17 +164,21 @@ export function useChat({ guestMode = false }: { guestMode?: boolean } = {}) {
       (m) => m.role === "assistant" && m.status === "streaming"
     );
     if (streaming) return;
-    saveMessages(sessionId, messages);
+    saveMessages(sessionId, messages, storageScope);
     // Sessions only enter the drawer index once they hold real content.
     if (messages.length > 0) {
-      setSessions((prev) => persistSessionIndex(upsertSession(prev, sessionId)));
+      setSessions((prev) => persistSessionIndex(upsertSession(prev, sessionId), storageScope));
     }
-    if (!guestMode) {
-      void saveRemoteSession(sessionId, { messages, contextBreak }).catch((error) =>
-        console.warn("[session] save failed:", error)
-      );
+    if (!guestMode && messages.length > 0) {
+      const meta = sessionsRef.current.find((item) => item.id === sessionId);
+      void saveRemoteSession(sessionId, {
+        messages,
+        contextBreak,
+        title: meta?.title,
+        titleGenerated: meta?.titleGenerated,
+      }).catch((error) => console.warn("[session] save failed:", error));
     }
-  }, [messages, contextBreak, sessionId, sessionReady, guestMode]);
+  }, [messages, contextBreak, sessionId, sessionReady, guestMode, storageScope]);
 
   // 首个完整回答落盘后，让模型为会话生成一个简短标题；失败时回退到首条问题截断。
   useEffect(() => {
@@ -153,10 +194,21 @@ export function useChat({ guestMode = false }: { guestMode?: boolean } = {}) {
     titleRequestedRef.current.add(sessionId);
     const question = firstUser.content.trim();
     const fallback = question.replace(/\s+/g, " ").slice(0, 18) || "图片题目";
-    const apply = (title: string) =>
+    const apply = (title: string) => {
+      const finalTitle = title || fallback;
       setSessions((prev) =>
-        persistSessionIndex(renameSession(prev, sessionId, title || fallback))
+        persistSessionIndex(renameSession(prev, sessionId, finalTitle), storageScope)
       );
+      if (!guestMode) {
+        void saveRemoteSession(sessionId, {
+          messages,
+          contextBreak,
+          title: finalTitle,
+          titleGenerated: true,
+        }).catch((error) => console.warn("[session] title save failed:", error));
+      }
+    };
+
     if (guestMode) {
       apply("");
       return;
@@ -171,7 +223,7 @@ export function useChat({ guestMode = false }: { guestMode?: boolean } = {}) {
         console.warn("[session] title generation failed:", error);
         apply("");
       });
-  }, [messages, sessionId, sessionReady, sessions, selectedModel, guestMode]);
+  }, [messages, sessionId, sessionReady, sessions, selectedModel, guestMode, storageScope, contextBreak]);
 
   useEffect(() => {
     try {
@@ -375,16 +427,16 @@ export function useChat({ guestMode = false }: { guestMode?: boolean } = {}) {
 
   const setLocalApiConfig = useCallback((config: LocalApiConfig) => {
     setLocalApiConfigState(config);
-    saveLocalApiConfig(config);
-  }, []);
+    saveLocalApiConfig(config, storageScope);
+  }, [storageScope]);
 
   const setOcrModel = useCallback((ocrModel: string) => {
     setLocalApiConfigState((current) => {
       const next = { ...current, ocrModel };
-      saveLocalApiConfig(next);
+      saveLocalApiConfig(next, storageScope);
       return next;
     });
-  }, []);
+  }, [storageScope]);
 
   const send = useCallback(async () => {
     const question = input.trim();
@@ -497,21 +549,21 @@ export function useChat({ guestMode = false }: { guestMode?: boolean } = {}) {
       setSessionReady(false);
       replaceSessionUrl(nextSessionId);
       setSessionId(nextSessionId);
-      setMessages(loadMessages(nextSessionId));
+      setMessages(loadMessages(nextSessionId, storageScope));
       setInput("");
       setImage(null);
       setThinking([]);
       setLoading(false);
       setContextBreak(0);
     },
-    [sessionId, stop]
+    [sessionId, stop, storageScope]
   );
 
   /** 删除会话：清掉本地索引、本地消息和服务端快照；删除当前会话则另起新会话。 */
   const deleteSession = useCallback(
     (targetId: string) => {
-      setSessions((prev) => persistSessionIndex(removeSession(prev, targetId)));
-      removeSavedMessages(targetId);
+      setSessions((prev) => persistSessionIndex(removeSession(prev, targetId), storageScope));
+      removeSavedMessages(targetId, storageScope);
       if (!guestMode) {
         void deleteRemoteSession(targetId).catch((error) =>
           console.warn("[session] remote delete failed:", error)
@@ -519,7 +571,7 @@ export function useChat({ guestMode = false }: { guestMode?: boolean } = {}) {
       }
       if (targetId === sessionId) reset();
     },
-    [sessionId, reset, guestMode]
+    [sessionId, reset, guestMode, storageScope]
   );
 
   /** 修改模型输出（所有回答都可编辑，用于纠正笔误）。仅改本地内容。 */

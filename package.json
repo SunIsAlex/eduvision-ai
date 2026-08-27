@@ -14,7 +14,8 @@
     "dev:frontend": "npm run dev --workspace frontend",
     "build": "npm run typecheck && npm run build --workspace frontend",
     "typecheck": "npm run typecheck --workspace worker && npm run typecheck --workspace frontend",
-    "test:tools": "tsx worker/scripts/tools-e2e.ts"
+    "test:tools": "tsx worker/scripts/tools-e2e.ts",
+    "test:accounts": "tsx worker/scripts/accounts-e2e.ts"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

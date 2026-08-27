@@ -11,6 +11,8 @@ WorkingDirectory=/opt/eduvision-ai
 Environment=NODE_ENV=production
 Environment=PORT=8791
 Environment=CONFIG_FILE=/var/lib/eduvision-ai/config.env
+Environment=USER_DATA_DIR=/var/lib/eduvision-ai/data
+Environment=SESSION_DATA_DIR=/opt/eduvision-ai/.session-data
 EnvironmentFile=/var/lib/eduvision-ai/config.env
 ExecStart=/usr/bin/npm run dev:node --workspace worker
 Restart=always
