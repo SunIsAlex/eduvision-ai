@@ -27,6 +27,9 @@ function normalize(m: unknown): ChatMessage | null {
     ...(Array.isArray(msg.lineChecks) ? { lineChecks: msg.lineChecks } : {}),
     ...(Array.isArray(msg.tools) ? { tools: msg.tools } : {}),
     ...(typeof msg.image === "string" ? { image: msg.image } : {}),
+    ...(typeof msg.document === "string" ? { document: msg.document } : {}),
+    ...(typeof msg.fileName === "string" ? { fileName: msg.fileName } : {}),
+    ...(typeof msg.requestId === "string" ? { requestId: msg.requestId } : {}),
     ...(typeof msg.ocrGenerated === "boolean" ? { ocrGenerated: msg.ocrGenerated } : {}),
     ...(typeof msg.ocrConfirmed === "boolean" ? { ocrConfirmed: msg.ocrConfirmed } : {}),
     ...(typeof msg.pipeline === "string" ? { pipeline: msg.pipeline } : {}),
@@ -48,6 +51,8 @@ function normalize(m: unknown): ChatMessage | null {
               ? ("error" as const)
               : msg.status === "stopped"
                 ? ("stopped" as const)
+                : msg.status === "streaming"
+                  ? ("streaming" as const)
                 : ("done" as const),
         }
       : {}),

@@ -9,6 +9,8 @@ interface Props {
   onChange: (v: string) => void;
   image: string | null;
   onImageChange: (v: string | null) => void;
+  pdf: { data: string; name: string } | null;
+  onPdfChange: (v: { data: string; name: string } | null) => void;
   onSubmit: () => void;
   onStop: () => void;
   loading: boolean;
@@ -38,7 +40,7 @@ export function Composer(props: Props) {
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   }, [value]);
 
-  const canSend = (value.trim().length > 0 || Boolean(props.image)) && !loading;
+  const canSend = (value.trim().length > 0 || Boolean(props.image) || Boolean(props.pdf)) && !loading;
 
   return (
     <div className="px-3 pb-3 pt-2 sm:px-6 sm:pb-5">
@@ -63,6 +65,15 @@ export function Composer(props: Props) {
             </div>
           </div>
         )}
+        {props.pdf && (
+          <div className="flex items-center gap-2 px-4 pt-3 text-sm text-ink">
+            <BookOpen className="h-5 w-5 text-red-500" />
+            <span className="max-w-[70%] truncate">{props.pdf.name}</span>
+            <button type="button" onClick={() => props.onPdfChange(null)} disabled={loading} aria-label="移除 PDF">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
 
         <textarea
           ref={textareaRef}
@@ -76,13 +87,13 @@ export function Composer(props: Props) {
               if (canSend) onSubmit();
             }
           }}
-          placeholder="输入题目，或上传图片后提问…（Enter 发送）"
+          placeholder="输入题目，或上传图片 / PDF 试卷…（Enter 发送）"
           className="max-h-40 w-full resize-none bg-transparent px-4 pb-1 pt-3 text-[15px] leading-6 text-ink outline-none placeholder:text-faint disabled:opacity-60"
         />
 
         <div className="flex items-center gap-1 px-2 pb-2">
           <div className="scrollbar-none flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
-            <ImageUpload onChange={props.onImageChange} disabled={loading} />
+            <ImageUpload onChange={props.onImageChange} onPdfChange={props.onPdfChange} disabled={loading} />
 
             <button
               type="button"

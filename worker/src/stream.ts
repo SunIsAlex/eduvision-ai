@@ -49,8 +49,8 @@ export async function* runPipeline(
     yield error("服务端未配置 API_KEY，请联系管理员。");
     return;
   }
-  if (!request.image && !request.question?.trim()) {
-    yield error("请上传题目图片或输入题目文字。");
+  if (!request.image && !request.document && !request.question?.trim()) {
+    yield error("请上传题目图片、PDF 或输入题目文字。");
     return;
   }
 
@@ -93,6 +93,8 @@ export async function* runPipeline(
       {
         question: request.question ?? "",
         image: request.image && answerSupportsImage ? request.image : undefined,
+        document: request.document,
+        fileName: request.fileName,
         history: answerSupportsImage
           ? request.history
           : request.history?.map((message) => ({ ...message, image: undefined })),

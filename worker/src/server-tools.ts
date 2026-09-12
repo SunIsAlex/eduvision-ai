@@ -1,5 +1,6 @@
 import { calc } from "../../frontend/src/lib/calc";
 import type { ToolResult } from "./tools";
+import vm from "node:vm";
 
 /** Execute only explicitly allow-listed, resource-bounded server tools. */
 export async function executeServerTool(name: string, rawArgs: string): Promise<ToolResult> {
@@ -12,6 +13,22 @@ export async function executeServerTool(name: string, rawArgs: string): Promise<
   if (name === "calculator") {
     try {
       return { ok: true, output: calc(String(args.expression ?? "")) };
+    } catch (error) {
+      return { ok: false, output: `工具执行失败：${(error as Error).message}` };
+    }
+  }
+  if (name === "javascript") {
+    const output: string[] = [];
+    try {
+      const context = vm.createContext(
+        { console: { log: (...values: unknown[]) => output.push(values.map((value) =>
+          typeof value === "string" ? value : JSON.stringify(value)
+        ).join(" ")) } },
+        { codeGeneration: { strings: false, wasm: false } }
+      );
+      new vm.Script(`"use strict";\n${String(args.code ?? "")}`, { filename: "model-tool.js" })
+        .runInContext(context, { timeout: 15_000 });
+      return { ok: true, output: output.join("\n").slice(0, 20_000) || "脚本执行完成（无输出）" };
     } catch (error) {
       return { ok: false, output: `工具执行失败：${(error as Error).message}` };
     }

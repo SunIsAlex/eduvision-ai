@@ -116,9 +116,9 @@ export const TOOL_DEFINITIONS = [
   },
 ] as const;
 
-/** Calculator is safe and fast server-side; arbitrary JavaScript stays in the browser sandbox. */
+/** All tools run server-side so detached generation jobs never depend on an open tab. */
 export const TOOL_EXECUTORS: Record<string, ToolExecutor> = {
   calculator: "server",
   function_plot: "server",
-  javascript: "browser",
+  javascript: "server",
 };

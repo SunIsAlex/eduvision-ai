@@ -156,32 +156,32 @@ function requiresFunctionPlot(question: string): boolean {
 function buildMessages(input: {
   question: string;
   image?: string;
+  document?: string;
+  fileName?: string;
   history?: ChatMessage[];
 }): ChatMessage[] {
   const messages: ChatMessage[] = [];
 
   if (input.history && input.history.length > 0) {
     for (const msg of input.history) {
-      const content = msg.content.trim() || (msg.image ? "用户在此轮上传了一张题目图片。" : "");
-      if (content || msg.image) {
-        messages.push({ role: msg.role, content, ...(msg.image ? { image: msg.image } : {}) });
+      const content = msg.content.trim() || (msg.image ? "用户在此轮上传了一张题目图片。" : msg.document ? "用户上传了一份 PDF 试卷。" : "");
+      if (content || msg.image || msg.document) {
+        messages.push({ role: msg.role, content, ...(msg.image ? { image: msg.image } : {}), ...(msg.document ? { document: msg.document, fileName: msg.fileName } : {}) });
       }
     }
   }
 
   const baseUserText =
     input.question.trim() ||
-    "请识别图片中的题目并简洁作答。只提取解题所需信息；看不清或信息不足的地方请明确说明。";
+    (input.document
+      ? "请完整阅读这份试卷，按原题号依次为每一道题编写解析。每题包含答案、关键步骤和必要说明；选择题说明选项依据，主观题给出可检查的完整过程。不得遗漏题目；无法辨认处明确标注。"
+      : "请识别图片中的题目并简洁作答。只提取解题所需信息；看不清或信息不足的地方请明确说明。");
   const userText = requiresJavaScript(input.question)
     ? `${baseUserText}\n\n执行要求：本题必须使用 javascript 建立方程并数值求解。先写出完整平衡关系、物料衡算和未知量的物理区间，然后第一轮立即调用 javascript；优先用二分法，代码输出数值根、代回残差及最终单位换算。不要手工试值、迭代或预先猜测答案。工具返回后直接引用结果简洁作答，不要重新计算。`
     : requiresCalculator(input.question)
     ? `${baseUserText}\n\n执行要求：本题属于必须使用 calculator 的数值计算。只确定公式，不做任何心算、估算或分步数值计算；第一轮立即用一个完整表达式调用 calculator。工具返回后直接引用结果给出简洁解答，不要重新计算或重复推导。`
     : baseUserText;
-  messages.push(
-    input.image
-      ? { role: "user", content: userText, image: input.image }
-      : { role: "user", content: userText }
-  );
+  messages.push({ role: "user", content: userText, ...(input.image ? { image: input.image } : {}), ...(input.document ? { document: input.document, fileName: input.fileName } : {}) });
   return messages;
 }
 
@@ -195,6 +195,15 @@ function imageBlock(image: string): ImageBlockParam {
     };
   }
   return { type: "image", source: { type: "url", url: image } };
+}
+
+function documentBlock(document: string): ImageBlockParam {
+  const match = document.match(/^data:application\/pdf;base64,(.+)$/s);
+  if (!match) throw new Error("不支持的 PDF data URL");
+  return {
+    type: "document",
+    source: { type: "base64", media_type: "application/pdf", data: match[1]! },
+  };
 }
 
 /** Strict first-pass transcription used before the user confirms the question. */
@@ -235,10 +244,14 @@ export async function transcribeImage(
 /** Convert app messages into Anthropic's native multimodal format. */
 function toAnthropicMessages(messages: ChatMessage[]): MessageParam[] {
   return messages.map((m) => {
-    if (m.image) {
+    if (m.image || m.document) {
       return {
         role: m.role,
-        content: [imageBlock(m.image), { type: "text", text: m.content }],
+        content: [
+          ...(m.image ? [imageBlock(m.image)] : []),
+          ...(m.document ? [documentBlock(m.document)] : []),
+          { type: "text", text: m.content },
+        ],
       };
     }
     return { role: m.role, content: m.content };
@@ -870,6 +883,8 @@ export async function* streamAnswer(
   input: {
     question: string;
     image?: string;
+    document?: string;
+    fileName?: string;
     history?: ChatMessage[];
     model?: string;
     requestId?: string;
@@ -925,7 +940,7 @@ export async function* streamAnswer(
 
   const client = createClient(env, signal);
   const messages = toAnthropicMessages(
-    buildMessages({ question: input.question, image: input.image, history: input.history })
+    buildMessages({ question: input.question, image: input.image, document: input.document, fileName: input.fileName, history: input.history })
   );
   // Keep an immutable problem-only context for Ultra review/correction. The main
   // answer loop appends tool calls and results to `messages`; feeding those
@@ -987,7 +1002,11 @@ export async function* streamAnswer(
     }));
     const params: MessageCreateParamsStreaming = {
       model: answerModel,
-      max_tokens: answerThinking ? MAX_ANSWER_TOKENS + 2048 : MAX_ANSWER_TOKENS,
+      max_tokens: input.document
+        ? 16_384
+        : answerThinking
+          ? MAX_ANSWER_TOKENS + 2048
+          : MAX_ANSWER_TOKENS,
       system:
         (answerThinking ? TEACHER_SYSTEM : DIRECT_TEACHER_SYSTEM) +
         skillPrompt +

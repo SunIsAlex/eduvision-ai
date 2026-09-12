@@ -58,6 +58,13 @@ function toOpenAIMessages(messages: MessageParam[]): OpenAIMessage[] {
             // the high-detail path for faithful mathematical transcription.
             return { type: "image_url", image_url: { url, detail: "high" } };
           }
+          if (block.type === "document") {
+            const source = block.source as Record<string, unknown> | undefined;
+            const url = source?.type === "base64"
+              ? `data:application/pdf;base64,${String(source.data)}`
+              : String(source?.url ?? "");
+            return { type: "file", file: { filename: "试卷.pdf", file_data: url } };
+          }
           return { type: "text", text: String(block.text ?? "") };
         }),
       });

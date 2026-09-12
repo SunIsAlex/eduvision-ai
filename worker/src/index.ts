@@ -1,8 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { streamSSE } from "hono/streaming";
-import { runPipeline } from "./stream";
-import { cancelBrowserToolWaits, deliverBrowserToolResult } from "./toolbridge";
+import { deliverBrowserToolResult } from "./toolbridge";
 import { getModelCatalog, isAvailableModel } from "./model-catalog";
 import { AccountStoreError } from "./account-store";
 import type { AccountUser } from "./account-store";
@@ -16,11 +15,13 @@ import {
   isAdminAuthenticatedRequest,
 } from "./auth";
 import { getUpstreamStatus } from "./upstream";
+import { getOrStartGeneration, subscribeGeneration } from "./generation-jobs";
 
 export const app = new Hono<{ Bindings: Env; Variables: { user: AccountUser } }>();
 
 // Keep room for base64 expansion, JSON framing, question text and history.
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+const MAX_PDF_BYTES = 20 * 1024 * 1024;
 const MAX_SESSION_BYTES = 12 * 1024 * 1024;
 
 app.use(
@@ -275,7 +276,7 @@ app.get("/health", (c) =>
       ultra: resolveUltraModel(c.env),
       review: resolveReviewModel(c.env),
     },
-    uploads: false,
+    uploads: { images: true, pdf: true, maxPdfBytes: MAX_PDF_BYTES },
     upstream: getUpstreamStatus(c.env),
     timestamp: new Date().toISOString(),
   })
@@ -345,6 +346,12 @@ app.post("/api/chat/stream", async (c) => {
       return c.json({ error: "图片超过请求限制，请压缩后重试" }, 413);
     }
   }
+  if (body.document && !body.document.startsWith("data:application/pdf;base64,")) {
+    return c.json({ error: "仅支持 PDF 文档" }, 400);
+  }
+  if (body.document && (body.document.length * 3) / 4 > MAX_PDF_BYTES) {
+    return c.json({ error: "PDF 超过 20 MB 限制" }, 413);
+  }
   if (body.model && !isAvailableModel(body.model, c.env)) {
     return c.json({ error: "所选模型当前不可用，请刷新模型列表后重试" }, 400);
   }
@@ -359,16 +366,12 @@ app.post("/api/chat/stream", async (c) => {
   }
 
   return streamSSE(c, async (stream) => {
-    // 客户端断开（点“停止”或直接关闭页面）时取消上游流，避免继续消耗
-    // token/额度；同时释放等待浏览器工具结果的挂起条目。
-    const controller = new AbortController();
-    const onAbort = () => controller.abort();
-    c.req.raw.signal.addEventListener("abort", onAbort);
-    stream.onAbort(onAbort);
-    const gen = runPipeline(c.env, body, { signal: controller.signal });
+    // Generation belongs to the authenticated server session, not this HTTP
+    // connection. Closing the tab only detaches this subscriber; the model
+    // continues and the completed answer is atomically saved to the session.
+    const job = getOrStartGeneration(c.env, c.env.ACCOUNTS!, c.get("user").id, body);
     try {
-      for await (const evt of gen) {
-        if (controller.signal.aborted) break;
+      for await (const evt of subscribeGeneration(job)) {
         await stream.writeSSE({
           event: evt.event,
           data: evt.data,
@@ -376,9 +379,6 @@ app.post("/api/chat/stream", async (c) => {
         if (evt.event === "done" || evt.event === "error") break;
       }
     } finally {
-      c.req.raw.signal.removeEventListener("abort", onAbort);
-      controller.abort();
-      cancelBrowserToolWaits(body.requestId ?? "local");
       await stream.close();
     }
   });

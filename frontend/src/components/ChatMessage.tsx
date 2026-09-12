@@ -253,6 +253,11 @@ export function ChatMessage({ message, thinking, showDebug = false, isLast = fal
               className="mt-2 max-h-64 rounded-xl border border-line object-contain"
             />
           )}
+          {message.fileName && (
+            <div className="mt-2 rounded-xl border border-line bg-white/60 px-3 py-2 text-sm">
+              PDF · {message.fileName || "试卷.pdf"}
+            </div>
+          )}
           {message.edited && !editing && (
             <div className="mt-1 flex justify-end">
               <button

@@ -9,11 +9,16 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   image?: string;
+  /** A PDF data URL. Documents are kept separate from images for provider formatting. */
+  document?: string;
+  fileName?: string;
 }
 
 /** Request body for POST /api/chat/stream. */
 export interface ChatRequest {
   image?: string;
+  document?: string;
+  fileName?: string;
   question?: string;
   history?: ChatMessage[];
   /** User-controlled provider reasoning mode. */
@@ -28,6 +33,12 @@ export interface ChatRequest {
   ultra?: boolean;
   /** OCR transcription was reviewed by the user; proceed to solving. */
   ocrConfirmed?: boolean;
+  /** Cloud-session metadata used by server-managed, resumable generations. */
+  sessionId?: string;
+  userMessageId?: string;
+  assistantMessageId?: string;
+  contextBreak?: number;
+  sessionMessages?: unknown[];
 }
 
 export const SKILL_IDS = ["general", "math", "english", "chemistry", "biology", "physics"] as const;

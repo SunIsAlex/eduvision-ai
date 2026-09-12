@@ -25,6 +25,8 @@ MyTokk Anthropic-compatible API → claude-sonnet-4-6
 ## 功能
 
 - Claude 原生多模态读图与连续对话，保留历史文字和图片。
+- 支持上传最大 20 MB 的 PDF 整份试卷，模型按原题号逐题给出答案与完整解析。
+- 登录用户的生成由服务端后台任务托管；关闭或刷新页面不会中止生成，完成答案会自动写回云端会话，重进后自动恢复。
 - 可选 adaptive thinking 摘要。
 - 深度思考默认开启，普通模式使用中等思考强度；用户仍可手动关闭。
 - 可选 Ultra 模式：主解使用高思考强度，先规划解题思路，作答完成后由子代理复核最终答案的数值与代数结论，发现不一致时自动追加修正。
@@ -107,7 +109,7 @@ sudo /usr/local/sbin/openclaw-eduvision-root status
 
 ## API
 
-- `POST /api/chat/stream`：SSE 对话流，可传 `skill=general|math|english|chemistry|biology|physics`。
+- `POST /api/chat/stream`：创建或重新订阅服务端生成任务的 SSE 流，可传图片、PDF 与 `skill=general|math|english|chemistry|biology|physics`。
 - `POST /api/tool/result`：浏览器回传工具结果。
 - `POST /api/title`：用当前会话模型为会话生成简短标题。
 - `GET /api/sessions`：读取当前用户的云端会话列表。

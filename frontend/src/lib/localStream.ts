@@ -40,6 +40,8 @@ function messages(request: {
   history: ApiMessage[];
   question?: string;
   image?: string;
+  document?: string;
+  fileName?: string;
 }): OpenAIMessage[] {
   const result: OpenAIMessage[] = request.history.map((message) => ({
     role: message.role,
@@ -57,7 +59,12 @@ function messages(request: {
           ...(request.question ? [{ type: "text", text: request.question }] : []),
           { type: "image_url", image_url: { url: request.image, detail: "high" } },
         ]
-      : request.question ?? "",
+      : request.document
+        ? [
+            { type: "file", file: { filename: request.fileName || "试卷.pdf", file_data: request.document } },
+            { type: "text", text: request.question || "请按原题号逐题编写完整解析，不得遗漏。" },
+          ]
+        : request.question ?? "",
   });
   return result;
 }
@@ -150,6 +157,8 @@ export async function streamLocalChat(
   request: {
     requestId: string;
     image?: string;
+    document?: string;
+    fileName?: string;
     question?: string;
     history: ApiMessage[];
     thinking?: boolean;

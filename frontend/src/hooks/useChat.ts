@@ -33,6 +33,7 @@ export function useChat({ guestMode = false, accountId }: { guestMode?: boolean;
   const [sessions, setSessions] = useState<SessionMeta[]>(() => loadSessionIndex(storageScope));
   const [input, setInput] = useState("");
   const [image, setImage] = useState<string | null>(null);
+  const [pdf, setPdf] = useState<{ data: string; name: string } | null>(null);
   const [localApiConfig, setLocalApiConfigState] = useState<LocalApiConfig>(() => loadLocalApiConfig(storageScope));
   const [loading, setLoading] = useState(false);
   const [thinking, setThinking] = useState<ThinkingStep[]>([]);
@@ -170,6 +171,24 @@ export function useChat({ guestMode = false, accountId }: { guestMode?: boolean;
       active = false;
     };
   }, [sessionId, guestMode, storageScope]);
+
+  // A closed tab only detaches from a server-managed generation. When this
+  // session is reopened, poll its cloud snapshot until the worker has saved
+  // the complete answer.
+  useEffect(() => {
+    if (guestMode || loading || !messages.some((message) => message.status === "streaming")) return;
+    let active = true;
+    const refresh = () => void loadRemoteSession(sessionId).then((snapshot) => {
+      if (!active || !snapshot) return;
+      setMessages(snapshot.messages);
+      if (!snapshot.messages.some((message) => message.status === "streaming")) {
+        saveMessages(sessionId, snapshot.messages, storageScope);
+      }
+    }).catch((error) => console.warn("[session] background answer refresh failed:", error));
+    refresh();
+    const timer = window.setInterval(refresh, 2000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [guestMode, loading, messages, sessionId, storageScope]);
 
   // 只保存完整回合，避免 URL 恢复出半截回答。
   useEffect(() => {
@@ -380,6 +399,8 @@ export function useChat({ guestMode = false, accountId }: { guestMode?: boolean;
       requestId: string;
       question: string;
       image?: string;
+      document?: string;
+      fileName?: string;
       history: ApiMessage[];
       patch: (fn: (m: ChatMessage) => ChatMessage) => void;
       onOcrResult?: (text: string) => void;
@@ -387,6 +408,9 @@ export function useChat({ guestMode = false, accountId }: { guestMode?: boolean;
       signal?: AbortSignal;
       /** 非中止的网络错误：true 时显示错误消息，false 时保留已有内容回到暂停态。 */
       failAsError: boolean;
+      sessionMessages?: ChatMessage[];
+      userMessageId?: string;
+      assistantMessageId?: string;
     }) => {
       try {
         if (
@@ -410,6 +434,8 @@ export function useChat({ guestMode = false, accountId }: { guestMode?: boolean;
           {
             requestId: opts.requestId,
             image: requestImage,
+            document: opts.document,
+            fileName: opts.fileName,
             question: opts.question,
             history: opts.history,
             thinking: thinkingEnabled,
@@ -419,6 +445,11 @@ export function useChat({ guestMode = false, accountId }: { guestMode?: boolean;
             localConfig: localApiConfig.apiKey.trim() && localApiConfig.apiUrl.trim() ? localApiConfig : undefined,
             availableModels: models,
             ocrConfirmed: opts.ocrConfirmed,
+            sessionId: guestMode ? undefined : sessionId,
+            userMessageId: opts.userMessageId,
+            assistantMessageId: opts.assistantMessageId,
+            contextBreak,
+            sessionMessages: opts.sessionMessages,
           },
           callbacks,
           opts.signal
@@ -440,7 +471,7 @@ export function useChat({ guestMode = false, accountId }: { guestMode?: boolean;
         }
       }
     },
-    [thinkingEnabled, selectedModel, selectedSkill, ultraEnabled, localApiConfig, models, guestMode, makeStreamCallbacks]
+    [thinkingEnabled, selectedModel, selectedSkill, ultraEnabled, localApiConfig, models, guestMode, makeStreamCallbacks, sessionId, contextBreak]
   );
 
   const setLocalApiConfig = useCallback((config: LocalApiConfig) => {
@@ -458,13 +489,16 @@ export function useChat({ guestMode = false, accountId }: { guestMode?: boolean;
 
   const send = useCallback(async () => {
     const question = input.trim();
-    if ((!question && !image) || loading) return;
+    if ((!question && !image && !pdf) || loading) return;
+
+    const requestId = uid();
 
     const userMessage: ChatMessage = {
       id: uid(),
       role: "user",
       content: question,
       image: image ?? undefined,
+      fileName: pdf?.name,
     };
     const assistantMessage: ChatMessage = {
       id: uid(),
@@ -473,6 +507,7 @@ export function useChat({ guestMode = false, accountId }: { guestMode?: boolean;
       reasoning: "",
       tools: [],
       status: "streaming",
+      requestId,
     };
 
     const history = messages
@@ -485,15 +520,16 @@ export function useChat({ guestMode = false, accountId }: { guestMode?: boolean;
       )
       .map((m) => ({ role: m.role, content: m.content, image: m.image }));
 
-    setMessages((prev) => [...prev, userMessage, assistantMessage]);
+    const sessionMessages = [...messages, userMessage, assistantMessage];
+    setMessages(sessionMessages);
     setInput("");
     setImage(null);
+    setPdf(null);
     setLoading(true);
     setThinking([]);
 
     const controller = new AbortController();
     abortRef.current = controller;
-    const requestId = uid();
 
     const patch = (fn: (m: ChatMessage) => ChatMessage) =>
       setMessages((prev) =>
@@ -506,6 +542,8 @@ export function useChat({ guestMode = false, accountId }: { guestMode?: boolean;
         requestId,
         question,
         image: image ?? undefined,
+        document: pdf?.data,
+        fileName: pdf?.name,
         history,
         patch,
         onOcrResult: (text) => {
@@ -520,6 +558,9 @@ export function useChat({ guestMode = false, accountId }: { guestMode?: boolean;
         },
         signal: controller.signal,
         failAsError: true,
+        sessionMessages,
+        userMessageId: userMessage.id,
+        assistantMessageId: assistantMessage.id,
       });
       if (ocrCompleted) {
         setMessages((prev) => prev.filter((message) => message.id !== assistantMessage.id));
@@ -529,7 +570,7 @@ export function useChat({ guestMode = false, accountId }: { guestMode?: boolean;
       setLoading(false);
       setThinking([]);
     }
-  }, [input, image, loading, messages, contextBreak, thinkingEnabled, selectedModel, selectedSkill, runStream]);
+  }, [input, image, pdf, loading, messages, contextBreak, runStream]);
 
   /** 结束当前上下文：断点设在现有对话末尾，下一道题不带前面的上下文。 */
   const endContext = useCallback(() => {
@@ -554,6 +595,7 @@ export function useChat({ guestMode = false, accountId }: { guestMode?: boolean;
     setMessages([]);
     setInput("");
     setImage(null);
+    setPdf(null);
     setThinking([]);
     setLoading(false);
     setContextBreak(0);
@@ -570,6 +612,7 @@ export function useChat({ guestMode = false, accountId }: { guestMode?: boolean;
       setMessages(loadMessages(nextSessionId, storageScope));
       setInput("");
       setImage(null);
+      setPdf(null);
       setThinking([]);
       setLoading(false);
       setContextBreak(0);
@@ -780,6 +823,8 @@ ${m.content}`.trim();
     setInput,
     image,
     setImage,
+    pdf,
+    setPdf,
     loading,
     thinking,
     thinkingEnabled,

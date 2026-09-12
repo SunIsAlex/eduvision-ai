@@ -1,4 +1,4 @@
-import type { ApiMessage, ModelOption, SkillId } from "./types";
+import type { ApiMessage, ChatMessage, ModelOption, SkillId } from "./types";
 import { runTool } from "./toolRunner";
 import type { LocalApiConfig } from "./localConfig";
 import { streamLocalChat } from "./localStream";
@@ -82,6 +82,8 @@ export async function streamChat(
   request: {
     requestId: string;
     image?: string;
+    document?: string;
+    fileName?: string;
     question?: string;
     history: ApiMessage[];
     thinking?: boolean;
@@ -92,6 +94,11 @@ export async function streamChat(
     availableModels?: ModelOption[];
     /** OCR text has been reviewed; solve without transcribing the image again. */
     ocrConfirmed?: boolean;
+    sessionId?: string;
+    userMessageId?: string;
+    assistantMessageId?: string;
+    contextBreak?: number;
+    sessionMessages?: ChatMessage[];
   },
   callbacks: StreamCallbacks,
   signal?: AbortSignal

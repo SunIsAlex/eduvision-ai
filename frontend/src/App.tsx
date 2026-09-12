@@ -516,6 +516,8 @@ function ChatApp({ account, guestMode = false, onExitGuest, onLogout }: { accoun
         onChange={chat.setInput}
         image={chat.image}
         onImageChange={chat.setImage}
+        pdf={chat.pdf}
+        onPdfChange={chat.setPdf}
         onSubmit={() => void chat.send()}
         onStop={chat.stop}
         loading={chat.loading}

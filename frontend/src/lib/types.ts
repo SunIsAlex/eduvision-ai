@@ -15,6 +15,9 @@ export interface ChatMessage {
   /** Tool calls made while producing this answer (assistant only). */
   tools?: ToolActivity[];
   image?: string;
+  document?: string;
+  fileName?: string;
+  requestId?: string;
   /** User text was populated from browser-local OCR; edits should not rerun OCR. */
   ocrGenerated?: boolean;
   /** User explicitly accepted the OCR transcription and started solving. */
@@ -82,4 +85,6 @@ export interface ApiMessage {
   role: Role;
   content: string;
   image?: string;
+  document?: string;
+  fileName?: string;
 }
